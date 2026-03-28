@@ -8,11 +8,15 @@ import { Wallet, AlertCircle } from 'lucide-react';
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   const router = useRouter();
 
   console.log('LoginPage: Rendering...');
 
-  const handleLogin = async () => {
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!supabase) {
       setError('Supabase não inicializado. Verifique as configurações.');
       return;
@@ -20,16 +24,27 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      if (error) throw error;
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/dashboard`
+          }
+        });
+        if (error) throw error;
+        alert('Verifique seu e-mail para confirmar o cadastro!');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (error) throw error;
+        router.push('/dashboard');
+      }
     } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.message || 'Erro ao fazer login com Google.');
+      console.error('Auth error:', error);
+      setError(error.message || 'Erro ao processar autenticação.');
     } finally {
       setLoading(false);
     }
@@ -53,16 +68,49 @@ export default function LoginPage() {
           </div>
         )}
 
-        <button
-          onClick={handleLogin}
-          disabled={loading}
-          className="w-full bg-white text-black hover:bg-neutral-200 font-bold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl active:scale-95 disabled:opacity-50 disabled:active:scale-100"
-        >
-          <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-          {loading ? 'Conectando...' : 'Entrar com Google'}
-        </button>
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-secondary ml-1">E-mail</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input-field"
+              placeholder="seu@email.com"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-text-secondary ml-1">Senha</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-field"
+              placeholder="••••••••"
+              required
+            />
+          </div>
 
-        <p className="text-center text-xs text-text-secondary pt-8">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full btn-primary py-4 mt-4"
+          >
+            {loading ? 'Processando...' : isSignUp ? 'Criar Conta' : 'Entrar'}
+          </button>
+        </form>
+
+        <div className="text-center">
+          <button
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-accent font-bold hover:underline"
+          >
+            {isSignUp ? 'Já tem uma conta? Entre aqui' : 'Não tem uma conta? Cadastre-se'}
+          </button>
+        </div>
+
+        <p className="text-center text-xs text-text-secondary pt-4">
           Ao entrar, você concorda com nossos Termos de Uso e Política de Privacidade.
         </p>
       </div>

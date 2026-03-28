@@ -55,7 +55,7 @@ export default function DashboardPage() {
   const [recurringBillsReminders, setRecurringBillsReminders] = useState<any[]>([]);
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
 
-  const fetchDashboardData = async (isBackground = false) => {
+  const fetchDashboardData = React.useCallback(async (isBackground = false) => {
     if (!supabase) {
       setError('Supabase não inicializado. Verifique as configurações.');
       setLoading(false);
@@ -159,11 +159,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [currentDate]);
+  }, [fetchDashboardData]);
 
   const handlePayBill = async (bill: any) => {
     try {
@@ -173,7 +173,7 @@ export default function DashboardPage() {
       const { error } = await supabase.from('expenses').insert([{
         description: `Pagamento: ${bill.name}`,
         amount: bill.amount,
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: `${format(new Date(), 'yyyy-MM-dd')}T12:00:00`,
         category_id: bill.category_id,
         person_id: bill.responsible_id,
         payment_method: bill.payment_method,
@@ -197,7 +197,7 @@ export default function DashboardPage() {
       const { error } = await supabase.from('incomes').insert([{
         description: `Recebimento: ${income.name}`,
         amount: income.amount,
-        date: format(new Date(), 'yyyy-MM-dd'),
+        date: `${format(new Date(), 'yyyy-MM-dd')}T12:00:00`,
         category_id: income.category_id,
         person_id: income.person_id,
         bank_id: income.bank_id,
