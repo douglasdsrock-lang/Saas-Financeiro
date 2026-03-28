@@ -3,7 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+console.log('Supabase: Environment check...', { 
+  hasUrl: !!supabaseUrl, 
+  hasKey: !!supabaseAnonKey,
+  urlPrefix: supabaseUrl ? supabaseUrl.substring(0, 10) : 'none'
+});
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase: Environment variables NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY are missing!');
+}
+
+let supabaseClient: any;
+try {
+  console.log('Supabase: Attempting to create client...');
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  console.log('Supabase: Client created successfully');
+} catch (e) {
+  console.error('Supabase: Failed to create client:', e);
+  supabaseClient = null;
+}
+
+export const supabase = supabaseClient;
 
 export type Database = {
   public: {

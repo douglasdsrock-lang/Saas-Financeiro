@@ -10,7 +10,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  console.log('LoginPage: Rendering...');
+
   const handleLogin = async () => {
+    if (!supabase) {
+      setError('Supabase não inicializado. Verifique as configurações.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

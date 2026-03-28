@@ -39,6 +39,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  console.log('DashboardPage: Rendering...', { loading, error });
   
   const [stats, setStats] = useState({
     totalIncome: 0,
@@ -54,6 +56,11 @@ export default function DashboardPage() {
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
 
   const fetchDashboardData = async (isBackground = false) => {
+    if (!supabase) {
+      setError('Supabase não inicializado. Verifique as configurações.');
+      setLoading(false);
+      return;
+    }
     if (!isBackground) setLoading(true);
     setError(null);
     try {

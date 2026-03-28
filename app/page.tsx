@@ -19,9 +19,12 @@ export default function HomePage() {
   }, [user, loading, router]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="animate-pulse text-accent font-bold text-xl">
-        Carregando...
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+      <div className="text-accent font-bold text-xl">
+        {loading ? 'Verificando Autenticação...' : 'Redirecionando...'}
+      </div>
+      <div className="text-text-secondary text-xs">
+        Status: {loading ? 'Carregando' : 'Pronto'} | Usuário: {user ? 'Sim' : 'Não'}
       </div>
     </div>
   );

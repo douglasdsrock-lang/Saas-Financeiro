@@ -24,20 +24,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  console.log('AuthProvider: Rendering...', { loading, pathname });
+
   useEffect(() => {
     const getSession = async () => {
+      console.log('AuthProvider: Initializing session check...');
       const timeout = setTimeout(() => {
-        console.warn('Supabase getSession is taking too long...');
+        console.warn('AuthProvider: Supabase getSession timed out after 5s');
         setLoading(false);
       }, 5000);
 
       try {
+        if (!supabase) {
+          console.error('AuthProvider: Supabase client is not initialized');
+          setLoading(false);
+          return;
+        }
+        
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        if (error) {
+          console.error('AuthProvider: getSession error:', error);
+          throw error;
+        }
+        console.log('AuthProvider: Session retrieved:', session ? 'User logged in' : 'No session');
         setUser(session?.user ?? null);
       } catch (error: any) {
+        console.error('AuthProvider: Error in getSession:', error);
         handleSupabaseError(error, 'Erro ao verificar sessão.');
       } finally {
+        console.log('AuthProvider: Finalizing initialization');
         clearTimeout(timeout);
         setLoading(false);
       }
@@ -45,12 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (!supabase) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('AuthProvider: Auth state changed:', event, session ? 'User logged in' : 'No session');
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('AuthProvider: Unmounting, unsubscribing...');
+      subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -64,7 +85,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loading, pathname, router]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push('/login');
   };
 
