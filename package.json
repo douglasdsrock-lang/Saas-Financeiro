@@ -9,14 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/postcss": "^4.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.446.0",
     "motion": "^11.11.1",
-    "next": "^15.2.2",
+    "next": "^15.1.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.53.0",
@@ -29,7 +28,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^8.57.0",
-    "eslint-config-next": "^15.2.2",
+    "eslint-config-next": "^15.1.7",
     "postcss": "^8",
     "typescript": "^5"
   }
