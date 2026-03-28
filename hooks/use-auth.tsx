@@ -27,17 +27,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   console.log('AuthProvider: Rendering...', { loading, pathname });
 
   useEffect(() => {
+    let mounted = true;
+    console.log('AuthProvider: Initializing session check...');
+
     const getSession = async () => {
-      console.log('AuthProvider: Initializing session check...');
       const timeout = setTimeout(() => {
-        console.warn('AuthProvider: Supabase getSession timed out after 5s');
-        setLoading(false);
-      }, 5000);
+        if (mounted) {
+          console.warn('AuthProvider: Supabase getSession timed out after 3s');
+          setLoading(false);
+        }
+      }, 3000);
 
       try {
         if (!supabase) {
           console.error('AuthProvider: Supabase client is not initialized');
-          setLoading(false);
+          if (mounted) setLoading(false);
           return;
         }
         
@@ -47,28 +51,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           throw error;
         }
         console.log('AuthProvider: Session retrieved:', session ? 'User logged in' : 'No session');
-        setUser(session?.user ?? null);
+        if (mounted) setUser(session?.user ?? null);
       } catch (error: any) {
         console.error('AuthProvider: Error in getSession:', error);
-        handleSupabaseError(error, 'Erro ao verificar sessão.');
+        // handleSupabaseError(error, 'Erro ao verificar sessão.');
       } finally {
         console.log('AuthProvider: Finalizing initialization');
         clearTimeout(timeout);
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
     getSession();
 
+    // Fail-safe: force loading to false after 5 seconds
+    const failSafeTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('AuthProvider: Fail-safe timeout triggered');
+        setLoading(false);
+      }
+    }, 5000);
+
     if (!supabase) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('AuthProvider: Auth state changed:', event, session ? 'User logged in' : 'No session');
-      setUser(session?.user ?? null);
-      setLoading(false);
+      if (mounted) {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     return () => {
+      mounted = false;
       console.log('AuthProvider: Unmounting, unsubscribing...');
       subscription.unsubscribe();
     };
