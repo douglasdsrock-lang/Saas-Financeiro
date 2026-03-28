@@ -64,15 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     getSession();
 
-    // Fail-safe: force loading to false after 5 seconds
-    const failSafeTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('AuthProvider: Fail-safe timeout triggered');
-        setLoading(false);
-      }
-    }, 5000);
-
-    if (!supabase) return;
+    if (!supabase) {
+      return () => {
+        mounted = false;
+      };
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('AuthProvider: Auth state changed:', event, session ? 'User logged in' : 'No session');
