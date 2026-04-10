@@ -20,7 +20,8 @@ export default function SaidasPage() {
     month: '',
     category: '',
     search: '',
-    payment_method: ''
+    payment_method: '',
+    credit_card_id: ''
   });
   
   const [people, setPeople] = useState<any[]>([]);
@@ -81,6 +82,7 @@ export default function SaidasPage() {
       
       if (filters.category) query = query.eq('category_id', filters.category);
       if (filters.payment_method) query = query.eq('payment_method', filters.payment_method);
+      if (filters.credit_card_id) query = query.eq('credit_card_id', filters.credit_card_id);
       if (filters.month) {
         const start = `${filters.month}-01`;
         const dateObj = new Date(start + 'T00:00:00');
@@ -135,11 +137,33 @@ export default function SaidasPage() {
       } else {
         // Create multiple expenses if it's an installment purchase
         const payloads = [];
+        let recurringBillId = null;
+
+        // If it's a fixed expense, create a recurring_bill template first
+        if (formData.is_fixed) {
+          const { data: rbData, error: rbError } = await supabase.from('recurring_bills').insert([{
+            name: formData.description,
+            amount: amountPerInstallment,
+            due_day: baseDate.getDate(),
+            category_id: formData.category_id,
+            responsible_id: formData.person_id,
+            payment_method: formData.payment_method,
+            credit_card_id: formData.payment_method === 'Cartão de Crédito' ? formData.credit_card_id : null,
+            active: true,
+            user_id: user.id
+          }]).select();
+
+          if (rbError) {
+            console.error('Error creating recurring bill:', rbError);
+          } else if (rbData && rbData[0]) {
+            recurringBillId = rbData[0].id;
+          }
+        }
+
         for (let i = 0; i < installmentsCount; i++) {
           const installmentDate = new Date(baseDate);
           installmentDate.setMonth(baseDate.getMonth() + i);
           
-          // Use YYYY-MM-DD format for storage if possible, or ensure T12:00:00
           const year = installmentDate.getFullYear();
           const month = String(installmentDate.getMonth() + 1).padStart(2, '0');
           const day = String(installmentDate.getDate()).padStart(2, '0');
@@ -154,6 +178,7 @@ export default function SaidasPage() {
             payment_method: formData.payment_method,
             credit_card_id: formData.payment_method === 'Cartão de Crédito' ? formData.credit_card_id : null,
             is_fixed: formData.is_fixed || false,
+            recurring_bill_id: recurringBillId,
             notes: formData.notes || null,
             user_id: user.id
           });
@@ -274,8 +299,19 @@ export default function SaidasPage() {
             <option value="Boleto">Boleto</option>
           </select>
 
+          {filters.payment_method === 'Cartão de Crédito' && (
+            <select 
+              value={filters.credit_card_id}
+              onChange={(e) => setFilters({...filters, credit_card_id: e.target.value})}
+              className="bg-panel border border-border rounded-lg px-3 py-2 text-sm text-accent"
+            >
+              <option value="">Todos os Cartões</option>
+              {creditCards.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
+            </select>
+          )}
+
           <button 
-            onClick={() => setFilters({ month: '', category: '', search: '', payment_method: '' })}
+            onClick={() => setFilters({ month: '', category: '', search: '', payment_method: '', credit_card_id: '' })}
             className="text-xs text-text-secondary hover:text-accent"
           >
             Limpar

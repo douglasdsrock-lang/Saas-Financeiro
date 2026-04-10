@@ -32,7 +32,8 @@ import {
   ResponsiveContainer,
   Cell,
   PieChart,
-  Pie
+  Pie,
+  LabelList
 } from 'recharts';
 
 export default function DashboardPage() {
@@ -47,11 +48,16 @@ export default function DashboardPage() {
     totalExpense: 0,
     totalInvested: 0,
     balance: 0,
-    cardSpending: 0
+    cardSpending: 0,
+    predictedIncome: 0,
+    predictedExpense: 0
   });
 
   const [chartData, setChartData] = useState<any[]>([]);
+  const [projectionData, setProjectionData] = useState<any[]>([]);
   const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [cardBreakdown, setCardBreakdown] = useState<any[]>([]);
+  const [cardDebtData, setCardDebtData] = useState<any[]>([]);
   const [recurringBillsReminders, setRecurringBillsReminders] = useState<any[]>([]);
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
 
@@ -92,28 +98,111 @@ export default function DashboardPage() {
         investments,
         cardPurchases,
         recurringBills,
-        recurringIncomes
+        recurringIncomes,
+        creditCards,
+        banks,
+        pendingInstallments,
+        allCardPurchases
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('investments', supabase.from('investments').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('card_purchases', supabase.from('card_purchases').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('recurring_bills', supabase.from('recurring_bills').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
-        fetchTable('recurring_incomes', supabase.from('recurring_incomes').select('*, categories(name)').eq('user_id', user.id).eq('active', true))
+        fetchTable('recurring_incomes', supabase.from('recurring_incomes').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
+        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
+        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
+        fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id))
       ]);
 
+      // Calculate Card Spending considering closing dates
+      let totalCardSpending = 0;
+      const breakdown: any[] = [];
+      
+      const { data: allCardExpenses, error: cardExpError } = await supabase
+        .from('expenses')
+        .select('*, categories(name)')
+        .eq('user_id', user.id)
+        .eq('payment_method', 'Cartão de Crédito');
+
+      const currentBillExpenses: any[] = [];
+
+      if (!cardExpError && allCardExpenses) {
+        creditCards.forEach((card: any) => {
+          const closingDay = card.closing_day || 10;
+          const billEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), closingDay, 23, 59, 59);
+          const billStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, closingDay + 1, 0, 0, 0);
+
+          const cardExpenses = allCardExpenses.filter((exp: any) => {
+            if (exp.credit_card_id !== card.id) return false;
+            const expDate = new Date(exp.date);
+            return expDate >= billStart && expDate <= billEnd;
+          });
+
+          const cardTotal = cardExpenses.reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
+          currentBillExpenses.push(...cardExpenses);
+          
+          if (cardTotal > 0) {
+            const bank = banks.find((b: any) => b.id === card.bank_id);
+            // Default colors for common banks if not set
+            let color = bank?.color || '#3b82f6';
+            const bankName = bank?.name?.toLowerCase() || '';
+            if (!bank?.color) {
+              if (bankName.includes('nubank')) color = '#8A05BE';
+              else if (bankName.includes('inter')) color = '#FF7A00';
+              else if (bankName.includes('itau') || bankName.includes('itaú')) color = '#EC7000';
+              else if (bankName.includes('santander')) color = '#CC0000';
+              else if (bankName.includes('bradesco')) color = '#ED1C24';
+            }
+
+            breakdown.push({
+              name: card.name,
+              value: cardTotal,
+              color: color
+            });
+            totalCardSpending += cardTotal;
+          }
+        });
+      }
+
+      setCardBreakdown(breakdown);
+
+      // Check for unpaid recurring items
+      const unpaidRecurringBills = recurringBills.filter((bill: any) => {
+        return !expenses.some((exp: any) => exp.recurring_bill_id === bill.id);
+      });
+      setRecurringBillsReminders(unpaidRecurringBills);
+
+      const unpaidRecurringIncomes = recurringIncomes.filter((inc: any) => {
+        return !incomes.some((income: any) => income.recurring_income_id === inc.id);
+      });
+      setRecurringIncomesReminders(unpaidRecurringIncomes);
+
       const totalIncome = incomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const totalExpense = expenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      
+      // Corrected Total Expense: Non-card expenses in calendar month + Total Card Bill for the period
+      const nonCardExpenses = expenses
+        .filter((e: any) => e.payment_method !== 'Cartão de Crédito')
+        .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      
+      const correctedTotalExpense = nonCardExpenses + totalCardSpending;
+      
       const totalInvested = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const cardSpending = cardPurchases.reduce((sum: number, i: any) => sum + Number(i.total_amount), 0);
-      const balance = totalIncome - totalExpense - totalInvested;
+      const balance = totalIncome - correctedTotalExpense - totalInvested;
+
+      // Predicted values
+      const unpaidBillsTotal = unpaidRecurringBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+      const unpaidIncomesTotal = unpaidRecurringIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
       setStats({
         totalIncome,
-        totalExpense,
+        totalExpense: correctedTotalExpense,
         totalInvested,
         balance,
-        cardSpending
+        cardSpending: totalCardSpending,
+        predictedIncome: totalIncome + unpaidIncomesTotal,
+        predictedExpense: correctedTotalExpense + unpaidBillsTotal
       });
 
       // Process Chart Data (Daily)
@@ -136,23 +225,95 @@ export default function DashboardPage() {
 
       setChartData(dailyData);
 
-      // Process Category Data
+      // Process Category Data - Including Card Spending and Recurring Bills
       const catMap: Record<string, number> = {};
-      expenses.forEach((e: any) => {
+      
+      // 1. Non-card expenses of the calendar month
+      expenses
+        .filter((e: any) => e.payment_method !== 'Cartão de Crédito')
+        .forEach((e: any) => {
+          const name = e.categories?.name || 'Outros';
+          catMap[name] = (catMap[name] || 0) + Number(e.amount);
+        });
+
+      // 2. Card expenses belonging to the current bill cycle
+      currentBillExpenses.forEach((e: any) => {
         const name = e.categories?.name || 'Outros';
         catMap[name] = (catMap[name] || 0) + Number(e.amount);
       });
-      setCategoryData(Object.entries(catMap).map(([name, value]) => ({ name, value })));
 
-      // Check for unpaid recurring items
-      const unpaidRecurringBills = recurringBills.filter((bill: any) => {
-        return !expenses.some((exp: any) => exp.recurring_bill_id === bill.id);
+      // 3. Unpaid recurring bills for the month (predicted)
+      unpaidRecurringBills.forEach((bill: any) => {
+        const name = bill.categories?.name || 'Outros';
+        catMap[name] = (catMap[name] || 0) + Number(bill.amount);
       });
-      setRecurringBillsReminders(unpaidRecurringBills);
+      
+      setCategoryData(Object.entries(catMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+      );
 
-      const unpaidRecurringIncomes = recurringIncomes.filter((inc: any) => {
-        return !incomes.some((income: any) => income.recurring_income_id === inc.id);
+      // Process Projection Data (Current + 3 Months)
+      const projection: any[] = [];
+      for (let i = 0; i <= 3; i++) {
+        const targetDate = addMonths(currentDate, i);
+        const monthName = format(targetDate, 'MMM', { locale: ptBR });
+        
+        // For future months, we use recurring items as the base
+        const monthRecurringIncomes = recurringIncomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0);
+        const monthRecurringBills = recurringBills.reduce((sum: number, bill: any) => sum + Number(bill.amount), 0);
+        
+        if (i === 0) {
+          // Current month: actual + pending
+          projection.push({
+            name: monthName,
+            entradas: totalIncome + unpaidIncomesTotal,
+            saidas: correctedTotalExpense + unpaidBillsTotal
+          });
+        } else {
+          // Future months: recurring only
+          projection.push({
+            name: monthName,
+            entradas: monthRecurringIncomes,
+            saidas: monthRecurringBills
+          });
+        }
+      }
+      setProjectionData(projection);
+
+      // Process Card Debt (Future Installments)
+      const debtMap: Record<string, number> = {};
+      
+      pendingInstallments.forEach((inst: any) => {
+        // Consider all pending installments as debt
+        const purchase = allCardPurchases.find((p: any) => p.id === inst.purchase_id);
+        if (purchase) {
+          const cardId = purchase.card_id;
+          debtMap[cardId] = (debtMap[cardId] || 0) + Number(inst.amount);
+        }
       });
+
+      const debtData = creditCards.map((card: any) => {
+        const bank = banks.find((b: any) => b.id === card.bank_id);
+        let color = bank?.color || '#3b82f6';
+        const bankName = bank?.name?.toLowerCase() || '';
+        if (!bank?.color) {
+          if (bankName.includes('nubank')) color = '#8A05BE';
+          else if (bankName.includes('inter')) color = '#FF7A00';
+          else if (bankName.includes('itau') || bankName.includes('itaú')) color = '#EC7000';
+          else if (bankName.includes('santander')) color = '#CC0000';
+          else if (bankName.includes('bradesco')) color = '#ED1C24';
+        }
+
+        return {
+          name: card.name,
+          value: debtMap[card.id] || 0,
+          color: color
+        };
+      }).sort((a: any, b: any) => b.value - a.value);
+      
+      setCardDebtData(debtData);
+
       setRecurringIncomesReminders(unpaidRecurringIncomes);
     } catch (error: any) {
       setError(handleSupabaseError(error, 'Erro ao carregar dados do dashboard.'));
@@ -177,6 +338,7 @@ export default function DashboardPage() {
         category_id: bill.category_id,
         person_id: bill.responsible_id,
         payment_method: bill.payment_method,
+        credit_card_id: bill.credit_card_id,
         is_fixed: true,
         recurring_bill_id: bill.id,
         user_id: user.id
@@ -272,12 +434,14 @@ export default function DashboardPage() {
             value={`R$ ${stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={TrendingUp}
             color="accent"
+            description={`Previsto: R$ ${stats.predictedIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           />
           <StatCard 
             title="Saídas" 
             value={`R$ ${stats.totalExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={TrendingDown}
             color="red"
+            description={`Previsto: R$ ${stats.predictedExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           />
           <StatCard 
             title="Investimentos" 
@@ -296,7 +460,10 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-2">
             <div className="flex items-center justify-between mb-8">
-              <h3 className="text-xl font-bold">Fluxo de Caixa</h3>
+              <div>
+                <h3 className="text-xl font-bold">Projeção Próximos Meses</h3>
+                <p className="text-xs text-text-secondary mt-1">Baseado em suas receitas e contas fixas</p>
+              </div>
               <div className="flex items-center gap-4 text-xs font-medium">
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-3 bg-accent rounded-full shadow-lg shadow-accent/20"></div>
@@ -308,15 +475,15 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-[350px] w-full">
+            <div className="h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
+                <BarChart data={projectionData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#262626" />
                   <XAxis 
-                    dataKey="day" 
+                    dataKey="name" 
                     axisLine={false} 
                     tickLine={false} 
-                    tick={{ fill: '#a3a3a3', fontSize: 10 }}
+                    tick={{ fill: '#a3a3a3', fontSize: 12 }}
                     dy={10}
                   />
                   <YAxis 
@@ -329,33 +496,140 @@ export default function DashboardPage() {
                       backgroundColor: '#141414', 
                       border: '1px solid #262626',
                       borderRadius: '16px',
-                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'
                     }}
+                    formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                     cursor={{ fill: '#262626' }}
                   />
-                  <Bar dataKey="entradas" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="entradas" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={40} />
+                  <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
-          <div className="space-y-8">
-            <Card>
-              <h3 className="text-xl font-bold mb-6">Gastos por Categoria</h3>
-              <div className="h-[250px]">
-                {categoryData.length > 0 ? (
+          <Card>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold">Dívida Parcelada</h3>
+                <p className="text-[10px] text-text-secondary mt-1">Total a pagar nos próximos meses</p>
+              </div>
+              <div className="p-2 bg-red-500/10 rounded-lg text-red-500">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="h-[200px] w-full">
+              {cardDebtData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={cardDebtData} layout="vertical" margin={{ left: -20, right: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#262626" />
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      axisLine={false} 
+                      tickLine={false}
+                      tick={{ fill: '#a3a3a3', fontSize: 10 }}
+                      width={120}
+                    />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#141414', border: '1px solid #262626', borderRadius: '12px' }}
+                      formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
+                    />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                      {cardDebtData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                      <LabelList 
+                        dataKey="value" 
+                        position="right" 
+                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        style={{ fill: '#fff', fontSize: '10px', fontWeight: 'bold' }}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
+                  Nenhuma dívida parcelada futura
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          <Card>
+            <h3 className="text-xl font-bold mb-6">Gastos por Categoria</h3>
+            <div className="h-[250px]">
+              {categoryData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {categoryData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][index % 7]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#141414', 
+                        border: '1px solid #262626',
+                        borderRadius: '12px'
+                      }}
+                      formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
+                  Sem dados para exibir
+                </div>
+              )}
+            </div>
+            <div className="mt-4 space-y-2">
+              {categoryData.slice(0, 5).map((cat, i) => (
+                <div key={cat.name} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][i % 7] }}></div>
+                    <span className="text-text-secondary">{cat.name}</span>
+                  </div>
+                  <span className="font-bold">R$ {cat.value.toLocaleString('pt-BR')}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+            <Card className="bg-accent/5 border-accent/20">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-accent/20 rounded-lg text-accent">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold">Gastos por Cartão</h3>
+                </div>
+                <p className="text-xl font-black text-accent">
+                  R$ {stats.cardSpending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              <div className="h-[180px] mb-4">
+                {cardBreakdown.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={categoryData}
-                        innerRadius={60}
-                        outerRadius={80}
+                        data={cardBreakdown}
+                        innerRadius={50}
+                        outerRadius={70}
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'][index % 5]} />
+                        {cardBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip 
@@ -364,42 +638,30 @@ export default function DashboardPage() {
                           border: '1px solid #262626',
                           borderRadius: '12px'
                         }}
+                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                       />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
-                    Sem dados para exibir
+                  <div className="h-full flex items-center justify-center text-text-secondary text-xs italic">
+                    Nenhum gasto no cartão
                   </div>
                 )}
               </div>
-              <div className="mt-4 space-y-2">
-                {categoryData.slice(0, 4).map((cat, i) => (
-                  <div key={cat.name} className="flex items-center justify-between text-sm">
+
+              <div className="space-y-2">
+                {cardBreakdown.map((card) => (
+                  <div key={card.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444'][i % 5] }}></div>
-                      <span className="text-text-secondary">{cat.name}</span>
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: card.color }}></div>
+                      <span className="text-text-secondary">{card.name}</span>
                     </div>
-                    <span className="font-bold">R$ {cat.value.toLocaleString('pt-BR')}</span>
+                    <span className="font-bold">R$ {card.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 ))}
               </div>
             </Card>
-
-            <Card className="bg-accent/5 border-accent/20">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-accent/20 rounded-lg text-accent">
-                  <CreditCard className="w-5 h-5" />
-                </div>
-                <h3 className="font-bold">Gasto no Cartão</h3>
-              </div>
-              <p className="text-2xl font-black text-accent">
-                R$ {stats.cardSpending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-xs text-text-secondary mt-1">Total de compras parceladas e à vista este mês</p>
-            </Card>
           </div>
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Lembretes de Contas a Pagar */}

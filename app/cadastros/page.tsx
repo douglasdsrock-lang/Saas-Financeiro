@@ -40,8 +40,10 @@ export default function CadastrosPage() {
   const [people, setPeople] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [creditCards, setCreditCards] = useState<any[]>([]);
 
   const { register, handleSubmit, reset, setValue, watch } = useForm();
+  const paymentMethod = watch('payment_method');
 
   const tabs = [
     { id: 'people', name: 'Pessoas', icon: Users },
@@ -67,14 +69,16 @@ export default function CadastrosPage() {
         return data || [];
       };
 
-      const [p, c, b] = await Promise.all([
+      const [p, c, b, cc] = await Promise.all([
         fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('user_id', user.id)),
-        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id))
+        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id))
       ]);
       setPeople(p);
       setCategories(c);
       setBanks(b);
+      setCreditCards(cc);
     } catch (e) {
       console.error('Error fetching helpers:', e);
     }
@@ -127,7 +131,7 @@ export default function CadastrosPage() {
         categories: ['name', 'type', 'color'],
         banks: ['name', 'color'],
         credit_cards: ['name', 'bank_id', 'holder_id', 'closing_day', 'due_day', 'limit_amount', 'active'],
-        recurring_bills: ['name', 'amount', 'due_day', 'category_id', 'responsible_id', 'payment_method', 'active'],
+        recurring_bills: ['name', 'amount', 'due_day', 'category_id', 'responsible_id', 'payment_method', 'credit_card_id', 'active'],
         recurring_incomes: ['name', 'amount', 'due_day', 'category_id', 'person_id', 'bank_id', 'active']
       };
 
@@ -304,16 +308,27 @@ export default function CadastrosPage() {
               </div>
             </div>
             {isBill && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Método de Pagamento</label>
-                <select {...register('payment_method')} className="input-field" required>
-                  <option value="Dinheiro">Dinheiro</option>
-                  <option value="Pix">Pix</option>
-                  <option value="Cartão de Crédito">Cartão de Crédito</option>
-                  <option value="Cartão de Débito">Cartão de Débito</option>
-                  <option value="Boleto">Boleto</option>
-                </select>
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Método de Pagamento</label>
+                  <select {...register('payment_method')} className="input-field" required>
+                    <option value="Dinheiro">Dinheiro</option>
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão de Crédito">Cartão de Crédito</option>
+                    <option value="Cartão de Débito">Cartão de Débito</option>
+                    <option value="Boleto">Boleto</option>
+                  </select>
+                </div>
+                {paymentMethod === 'Cartão de Crédito' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Cartão de Crédito</label>
+                    <select {...register('credit_card_id')} className="input-field" required>
+                      <option value="">Selecione...</option>
+                      {creditCards.map(cc => <option key={cc.id} value={cc.id}>{cc.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
             {!isBill && (
               <div>

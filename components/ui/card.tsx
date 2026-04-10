@@ -24,9 +24,10 @@ interface StatCardProps {
   };
   className?: string;
   color?: string;
+  description?: string;
 }
 
-export function StatCard({ title, value, icon: Icon, trend, className, color = 'accent' }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, trend, className, color = 'accent', description }: StatCardProps) {
   const colorClasses: Record<string, string> = {
     accent: 'bg-accent/10 text-accent',
     red: 'bg-red-500/10 text-red-500',
@@ -53,6 +54,11 @@ export function StatCard({ title, value, icon: Icon, trend, className, color = '
       <div>
         <p className="text-sm text-text-secondary font-medium">{title}</p>
         <h3 className="text-2xl font-black mt-1">{value}</h3>
+        {description && (
+          <p className="text-xs text-text-secondary mt-2 font-medium">
+            {description}
+          </p>
+        )}
       </div>
     </Card>
   );

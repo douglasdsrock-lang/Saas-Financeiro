@@ -55,6 +55,7 @@ export type Database = {
           category_id: string;
           person_id: string;
           bank_id: string | null;
+          recurring_income_id: string | null;
           notes: string | null;
           user_id: string;
           created_at: string;
@@ -146,6 +147,7 @@ export type Database = {
           category_id: string;
           responsible_id: string;
           payment_method: string;
+          credit_card_id: string | null;
           active: boolean;
           user_id: string;
         };
