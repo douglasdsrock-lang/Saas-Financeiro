@@ -35,6 +35,7 @@ import {
   Pie,
   LabelList
 } from 'recharts';
+import { motion } from 'framer-motion';
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -458,7 +459,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 shadow-xl shadow-black/20">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-xl font-bold">Projeção Próximos Meses</h3>
@@ -475,9 +476,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-[300px] w-full">
+            <div className="h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={projectionData}>
+                <BarChart data={projectionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#262626" />
                   <XAxis 
                     dataKey="name" 
@@ -490,158 +491,208 @@ export default function DashboardPage() {
                     axisLine={false} 
                     tickLine={false} 
                     tick={{ fill: '#a3a3a3', fontSize: 10 }}
+                    tickFormatter={(value) => `R$ ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
                   />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: '#141414', 
                       border: '1px solid #262626',
                       borderRadius: '16px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
                     }}
                     formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
-                    cursor={{ fill: '#262626' }}
+                    cursor={{ fill: '#262626', opacity: 0.4 }}
                   />
-                  <Bar dataKey="entradas" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={40} />
-                  <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />
+                  <Bar dataKey="entradas" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={45} />
+                  <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={45} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </Card>
 
-          <Card>
+          <Card className="shadow-xl shadow-black/20 border-red-500/10">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-xl font-bold">Dívida Parcelada</h3>
-                <p className="text-[10px] text-text-secondary mt-1">Total a pagar nos próximos meses</p>
+                <p className="text-[10px] text-text-secondary mt-1 uppercase tracking-wider font-bold">Comprometimento Futuro</p>
               </div>
-              <div className="p-2 bg-red-500/10 rounded-lg text-red-500">
+              <div className="p-2.5 bg-red-500/10 rounded-2xl text-red-500 shadow-inner">
                 <AlertCircle className="w-5 h-5" />
               </div>
             </div>
-            <div className="h-[200px] w-full">
+            
+            <div className="space-y-6 mt-4">
               {cardDebtData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={cardDebtData} layout="vertical" margin={{ left: -20, right: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#262626" />
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      axisLine={false} 
-                      tickLine={false}
-                      tick={{ fill: '#a3a3a3', fontSize: 10 }}
-                      width={120}
-                    />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#141414', border: '1px solid #262626', borderRadius: '12px' }}
-                      formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
-                      {cardDebtData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                      <LabelList 
-                        dataKey="value" 
-                        position="right" 
-                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-                        style={{ fill: '#fff', fontSize: '10px', fontWeight: 'bold' }}
+                cardDebtData.map((card, index) => (
+                  <div key={card.name} className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-bold text-text-secondary">{card.name}</span>
+                      <span className="text-sm font-black text-white">
+                        R$ {card.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="h-3 w-full bg-neutral-900 rounded-full overflow-hidden border border-white/5">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min((card.value / (Math.max(...cardDebtData.map(d => d.value)) || 1)) * 100, 100)}%` }}
+                        transition={{ duration: 1, delay: index * 0.1 }}
+                        className="h-full rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                        style={{ backgroundColor: card.color }}
                       />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                    </div>
+                  </div>
+                ))
               ) : (
-                <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
+                <div className="h-[200px] flex flex-col items-center justify-center text-text-secondary text-sm italic gap-3">
+                  <div className="w-12 h-12 rounded-full bg-neutral-900 flex items-center justify-center">
+                    <CheckCircle2 className="w-6 h-6 text-accent/20" />
+                  </div>
                   Nenhuma dívida parcelada futura
                 </div>
               )}
             </div>
+            
+            {cardDebtData.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-border/50">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium text-text-secondary">Total Parcelado</span>
+                  <span className="text-lg font-black text-red-500">
+                    R$ {cardDebtData.reduce((acc, curr) => acc + curr.value, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-          <Card>
-            <h3 className="text-xl font-bold mb-6">Gastos por Categoria</h3>
-            <div className="h-[250px]">
-              {categoryData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][index % 7]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#141414', 
-                        border: '1px solid #262626',
-                        borderRadius: '12px'
-                      }}
-                      formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
-                  Sem dados para exibir
-                </div>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+          <Card className="shadow-xl shadow-black/20">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-xl font-bold">Gastos por Categoria</h3>
+              <div className="p-2 bg-accent/10 rounded-xl text-accent">
+                <TrendingDown className="w-5 h-5" />
+              </div>
             </div>
-            <div className="mt-4 space-y-2">
-              {categoryData.slice(0, 5).map((cat, i) => (
-                <div key={cat.name} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][i % 7] }}></div>
-                    <span className="text-text-secondary">{cat.name}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div className="h-[280px] relative">
+                {categoryData.length > 0 ? (
+                  <>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={categoryData}
+                          innerRadius={75}
+                          outerRadius={100}
+                          paddingAngle={8}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][index % 7]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#141414', 
+                            border: '1px solid #262626',
+                            borderRadius: '16px',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                          }}
+                          formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">Total</span>
+                      <span className="text-xl font-black text-white">
+                        R$ {categoryData.reduce((acc, curr) => acc + curr.value, 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-text-secondary text-sm italic">
+                    Sem dados para exibir
                   </div>
-                  <span className="font-bold">R$ {cat.value.toLocaleString('pt-BR')}</span>
-                </div>
-              ))}
+                )}
+              </div>
+              <div className="space-y-4">
+                {categoryData.slice(0, 6).map((cat, i) => (
+                  <div key={cat.name} className="group">
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][i % 7] }}></div>
+                        <span className="text-text-secondary font-medium group-hover:text-white transition-colors">{cat.name}</span>
+                      </div>
+                      <span className="font-bold">R$ {cat.value.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-neutral-900 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all duration-1000" 
+                        style={{ 
+                          width: `${(cat.value / (categoryData.reduce((acc, curr) => acc + curr.value, 0) || 1)) * 100}%`,
+                          backgroundColor: ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'][i % 7] 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </Card>
 
-            <Card className="bg-accent/5 border-accent/20">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-accent/20 rounded-lg text-accent">
-                    <CreditCard className="w-5 h-5" />
-                  </div>
-                  <h3 className="font-bold">Gastos por Cartão</h3>
+          <Card className="bg-accent/[0.02] border-accent/10 shadow-xl shadow-black/20 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 blur-3xl rounded-full -mr-16 -mt-16"></div>
+            <div className="flex items-center justify-between mb-8 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-accent/10 rounded-2xl text-accent shadow-inner">
+                  <CreditCard className="w-6 h-6" />
                 </div>
-                <p className="text-xl font-black text-accent">
+                <div>
+                  <h3 className="font-bold text-xl">Gastos por Cartão</h3>
+                  <p className="text-xs text-text-secondary">Distribuição da fatura atual</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black text-accent">
                   R$ {stats.cardSpending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
+            </div>
 
-              <div className="h-[180px] mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
+              <div className="h-[240px] relative">
                 {cardBreakdown.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={cardBreakdown}
-                        innerRadius={50}
-                        outerRadius={70}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {cardBreakdown.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: '#141414', 
-                          border: '1px solid #262626',
-                          borderRadius: '12px'
-                        }}
-                        formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={cardBreakdown}
+                          innerRadius={65}
+                          outerRadius={90}
+                          paddingAngle={6}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {cardBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: '#141414', 
+                            border: '1px solid #262626',
+                            borderRadius: '16px',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                          }}
+                          formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <CreditCard className="w-6 h-6 text-accent/20 mb-1" />
+                      <span className="text-[10px] uppercase tracking-widest text-text-secondary font-bold">Cartões</span>
+                    </div>
+                  </>
                 ) : (
                   <div className="h-full flex items-center justify-center text-text-secondary text-xs italic">
                     Nenhum gasto no cartão
@@ -649,19 +700,31 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {cardBreakdown.map((card) => (
-                  <div key={card.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: card.color }}></div>
-                      <span className="text-text-secondary">{card.name}</span>
+                  <div key={card.name} className="group">
+                    <div className="flex items-center justify-between text-sm mb-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: card.color }}></div>
+                        <span className="text-text-secondary font-medium group-hover:text-white transition-colors">{card.name}</span>
+                      </div>
+                      <span className="font-bold">R$ {card.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <span className="font-bold">R$ {card.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <div className="h-1.5 w-full bg-neutral-900 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all duration-1000" 
+                        style={{ 
+                          width: `${(card.value / (stats.cardSpending || 1)) * 100}%`,
+                          backgroundColor: card.color 
+                        }}
+                      ></div>
+                    </div>
                   </div>
                 ))}
               </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Lembretes de Contas a Pagar */}
