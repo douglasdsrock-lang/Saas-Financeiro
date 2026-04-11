@@ -63,7 +63,9 @@ export default function DashboardPage() {
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
 
   const fetchDashboardData = React.useCallback(async (isBackground = false) => {
+    console.log('fetchDashboardData: Starting...', { isBackground });
     if (!supabase) {
+      console.error('fetchDashboardData: Supabase not initialized');
       setError('Supabase não inicializado. Verifique as configurações.');
       setLoading(false);
       return;
@@ -71,9 +73,17 @@ export default function DashboardPage() {
     if (!isBackground) setLoading(true);
     setError(null);
     try {
+      console.log('fetchDashboardData: Fetching user...');
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      if (!user) return;
+      if (authError) {
+        console.error('fetchDashboardData: Auth error', authError);
+        throw authError;
+      }
+      if (!user) {
+        console.warn('fetchDashboardData: No user found');
+        setLoading(false);
+        return;
+      }
 
       const start = startOfMonth(currentDate);
       const end = endOfMonth(currentDate);
@@ -116,6 +126,12 @@ export default function DashboardPage() {
         fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id))
       ]);
+
+      console.log('fetchDashboardData: Data fetched, processing...', { 
+        incomes: incomes.length, 
+        expenses: expenses.length,
+        creditCards: creditCards.length 
+      });
 
       // Calculate Card Spending considering closing dates
       let totalCardSpending = 0;
@@ -316,7 +332,9 @@ export default function DashboardPage() {
       setCardDebtData(debtData);
 
       setRecurringIncomesReminders(unpaidRecurringIncomes);
+      console.log('fetchDashboardData: Success');
     } catch (error: any) {
+      console.error('fetchDashboardData: Error', error);
       setError(handleSupabaseError(error, 'Erro ao carregar dados do dashboard.'));
     } finally {
       setLoading(false);
@@ -395,6 +413,19 @@ export default function DashboardPage() {
             <RefreshCcw className="w-4 h-4" />
             Tentar Novamente
           </button>
+        </div>
+      </SidebarLayout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <SidebarLayout>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <RefreshCcw className="w-8 h-8 text-accent animate-spin" />
+            <p className="text-text-secondary animate-pulse font-medium">Carregando dados...</p>
+          </div>
         </div>
       </SidebarLayout>
     );
@@ -500,6 +531,9 @@ export default function DashboardPage() {
                       borderRadius: '16px',
                       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
                     }}
+                    itemStyle={{ color: '#fff' }}
+                    labelStyle={{ color: '#fff' }}
+                    wrapperStyle={{ zIndex: 1000 }}
                     formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                     cursor={{ fill: '#262626', opacity: 0.4 }}
                   />
@@ -598,6 +632,9 @@ export default function DashboardPage() {
                             borderRadius: '16px',
                             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
                           }}
+                          itemStyle={{ color: '#fff' }}
+                          labelStyle={{ color: '#fff' }}
+                          wrapperStyle={{ zIndex: 1000 }}
                           formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                         />
                       </PieChart>
@@ -684,6 +721,9 @@ export default function DashboardPage() {
                             borderRadius: '16px',
                             boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
                           }}
+                          itemStyle={{ color: '#fff' }}
+                          labelStyle={{ color: '#fff' }}
+                          wrapperStyle={{ zIndex: 1000 }}
                           formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                         />
                       </PieChart>
