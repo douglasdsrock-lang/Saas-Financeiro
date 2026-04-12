@@ -15,12 +15,13 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  RefreshCcw
+  RefreshCcw,
+  Target
 } from 'lucide-react';
 import { StatCard, Card } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
-import { handleSupabaseError } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { handleSupabaseError, formatDate } from '@/lib/utils';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   BarChart, 
@@ -42,7 +43,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  console.log('DashboardPage: Rendering...', { loading, error });
+  // DashboardPage: Rendering...
   
   const [stats, setStats] = useState({
     totalIncome: 0,
@@ -51,7 +52,8 @@ export default function DashboardPage() {
     balance: 0,
     cardSpending: 0,
     predictedIncome: 0,
-    predictedExpense: 0
+    predictedExpense: 0,
+    predictedBalance: 0
   });
 
   const [chartData, setChartData] = useState<any[]>([]);
@@ -59,11 +61,13 @@ export default function DashboardPage() {
   const [categoryData, setCategoryData] = useState<any[]>([]);
   const [cardBreakdown, setCardBreakdown] = useState<any[]>([]);
   const [cardDebtData, setCardDebtData] = useState<any[]>([]);
+  const [pendingExpenses, setPendingExpenses] = useState<any[]>([]);
   const [recurringBillsReminders, setRecurringBillsReminders] = useState<any[]>([]);
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
+  const [cardBillReminders, setCardBillReminders] = useState<any[]>([]);
 
   const fetchDashboardData = React.useCallback(async (isBackground = false) => {
-    console.log('fetchDashboardData: Starting...', { isBackground });
+    console.log('fetchDashboardData: Starting...', { isBackground, currentDate: currentDate.toISOString() });
     if (!supabase) {
       console.error('fetchDashboardData: Supabase not initialized');
       setError('Supabase não inicializado. Verifique as configurações.');
@@ -74,23 +78,29 @@ export default function DashboardPage() {
     setError(null);
     try {
       console.log('fetchDashboardData: Fetching user...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const { data: authData, error: authError } = await supabase.auth.getUser();
       if (authError) {
         console.error('fetchDashboardData: Auth error', authError);
         throw authError;
       }
+      const user = authData?.user;
       if (!user) {
         console.warn('fetchDashboardData: No user found');
         setLoading(false);
         return;
       }
 
+      console.log('fetchDashboardData: User found:', user.id);
       const start = startOfMonth(currentDate);
       const end = endOfMonth(currentDate);
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
+      
+      // Fetch expenses from the previous month to cover credit card cycles
+      const extendedStartStr = format(subDays(start, 45), 'yyyy-MM-dd');
 
       const fetchTable = async (tableName: string, query: any) => {
+        console.log(`fetchDashboardData: Fetching table ${tableName}...`);
         const { data, error } = await query;
         if (error) {
           if (error.code === '42P01') {
@@ -100,14 +110,15 @@ export default function DashboardPage() {
           console.warn(`Error fetching ${tableName}:`, error);
           return [];
         }
+        console.log(`fetchDashboardData: Table ${tableName} fetched:`, data?.length || 0);
         return data || [];
       };
 
       const [
         incomes,
-        expenses,
+        allPaidExpenses,
+        pendingExpenses,
         investments,
-        cardPurchases,
         recurringBills,
         recurringIncomes,
         creditCards,
@@ -116,9 +127,9 @@ export default function DashboardPage() {
         allCardPurchases
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
-        fetchTable('expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
+        fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr).lte('date', endStr)),
+        fetchTable('pending_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('investments', supabase.from('investments').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
-        fetchTable('card_purchases', supabase.from('card_purchases').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('recurring_bills', supabase.from('recurring_bills').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('recurring_incomes', supabase.from('recurring_incomes').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
@@ -127,67 +138,189 @@ export default function DashboardPage() {
         fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id))
       ]);
 
+      console.log('fetchDashboardData: Promise.all finished', {
+        paid: allPaidExpenses.length,
+        pending: pendingExpenses.length
+      });
+
+      if (!incomes || !allPaidExpenses || !pendingExpenses || !investments) {
+        console.error('fetchDashboardData: Critical data missing');
+        throw new Error('Dados críticos não foram carregados corretamente.');
+      }
+
+      // Filter paid expenses for the calendar month stats
+      const paidExpenses = allPaidExpenses.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= start && d <= end;
+      });
+
       console.log('fetchDashboardData: Data fetched, processing...', { 
         incomes: incomes.length, 
-        expenses: expenses.length,
+        paidExpenses: paidExpenses.length,
+        allPaidExpenses: allPaidExpenses.length,
+        pendingExpenses: pendingExpenses.length,
         creditCards: creditCards.length 
       });
 
-      // Calculate Card Spending considering closing dates
+      // Calculate Card Spending and Bills for the current month
+      const cardBills: any[] = [];
+      let pendingCardTotal = 0;
       let totalCardSpending = 0;
       const breakdown: any[] = [];
-      
-      const { data: allCardExpenses, error: cardExpError } = await supabase
-        .from('expenses')
-        .select('*, categories(name)')
-        .eq('user_id', user.id)
-        .eq('payment_method', 'Cartão de Crédito');
-
       const currentBillExpenses: any[] = [];
+      
+      const allPaidCardExpenses = allPaidExpenses.filter((e: any) => 
+        e.payment_method === 'Cartão de Crédito' || e.payment_method === 'Cartão de crédito'
+      );
+      
+      const pendingCardExpenses = pendingExpenses.filter((e: any) => 
+        e.payment_method === 'Cartão de Crédito' || e.payment_method === 'Cartão de crédito'
+      );
 
-      if (!cardExpError && allCardExpenses) {
-        creditCards.forEach((card: any) => {
-          const closingDay = card.closing_day || 10;
-          const billEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), closingDay, 23, 59, 59);
-          const billStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, closingDay + 1, 0, 0, 0);
+      creditCards.forEach((card: any) => {
+        // Bill Cycle Logic
+        // The bill due in Month M (currentDate)
+        // Closing day is CD. Cycle ends on CD-1 of Month M.
+        const dueDay = card.due_day || 10;
+        const closingDay = card.closing_day || (dueDay > 7 ? dueDay - 7 : 1);
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        
+        // Cycle Logic: If closing day is 20, cycle is from 21st of previous month to 20th of current month
+        // Example: March 21 to April 20
+        const cycleEnd = new Date(year, month, closingDay, 23, 59, 59);
+        const cycleStart = new Date(year, month, closingDay + 1, 0, 0, 0);
+        // Adjust start to previous month
+        cycleStart.setMonth(cycleStart.getMonth() - 1);
+        
+        console.log(`DEBUG: Card: ${card.name}, Due: ${dueDay}, Closing: ${closingDay}, Cycle: ${cycleStart.toISOString()} to ${cycleEnd.toISOString()}`);
 
-          const cardExpenses = allCardExpenses.filter((exp: any) => {
-            if (exp.credit_card_id !== card.id) return false;
-            const expDate = new Date(exp.date);
-            return expDate >= billStart && expDate <= billEnd;
-          });
-
-          const cardTotal = cardExpenses.reduce((sum: number, exp: any) => sum + Number(exp.amount), 0);
-          currentBillExpenses.push(...cardExpenses);
-          
-          if (cardTotal > 0) {
-            const bank = banks.find((b: any) => b.id === card.bank_id);
-            // Default colors for common banks if not set
-            let color = bank?.color || '#3b82f6';
-            const bankName = bank?.name?.toLowerCase() || '';
-            if (!bank?.color) {
-              if (bankName.includes('nubank')) color = '#8A05BE';
-              else if (bankName.includes('inter')) color = '#FF7A00';
-              else if (bankName.includes('itau') || bankName.includes('itaú')) color = '#EC7000';
-              else if (bankName.includes('santander')) color = '#CC0000';
-              else if (bankName.includes('bradesco')) color = '#ED1C24';
-            }
-
-            breakdown.push({
-              name: card.name,
-              value: cardTotal,
-              color: color
-            });
-            totalCardSpending += cardTotal;
-          }
+        // 1. Find expenses (paid and pending) that belong to this bill cycle
+        const cyclePaidExpenses = allPaidCardExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return e.credit_card_id === card.id && d >= cycleStart && d <= cycleEnd;
         });
-      }
 
-      setCardBreakdown(breakdown);
+        // For pending, we include only expenses for this card that fall within the cycle
+        const cyclePendingExpenses = pendingCardExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return e.credit_card_id === card.id && d >= cycleStart && d <= cycleEnd;
+        });
+        
+        // 2. Find installments due in the cycle of the bill
+        const installmentItems = pendingInstallments.filter((inst: any) => {
+          const purchase = allCardPurchases.find((p: any) => p.id === inst.purchase_id);
+          
+          // Format dates to YYYY-MM-DD for accurate date-only comparison
+          const dueDateStr = inst.due_date; // Assuming YYYY-MM-DD format
+          const cycleStartStr = format(cycleStart, 'yyyy-MM-dd');
+          const cycleEndStr = format(cycleEnd, 'yyyy-MM-dd');
+          
+          return purchase && purchase.card_id === card.id && dueDateStr >= cycleStartStr && dueDateStr <= cycleEndStr;
+        });
+
+        // 3. Find RECURRING bills set to this card for this cycle
+        const recurringItems = recurringBills.filter((rb: any) => {
+          if (rb.payment_method !== 'Cartão de Crédito' || rb.credit_card_id !== card.id) return false;
+          
+          // Check if already created as expense in this SPECIFIC cycle
+          const hasPaid = allPaidExpenses.some((exp: any) => 
+            exp.recurring_bill_id === rb.id && new Date(exp.date) >= cycleStart && new Date(exp.date) <= cycleEnd
+          );
+          const hasPending = pendingExpenses.some((exp: any) => 
+            exp.recurring_bill_id === rb.id && new Date(exp.date) >= cycleStart && new Date(exp.date) <= cycleEnd
+          );
+          return !hasPaid && !hasPending;
+        });
+
+        const paidTotal = cyclePaidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+        
+        const totalBillAmount = paidTotal;
+        const totalSpentInCycle = totalBillAmount;
+        
+        // Generate a bill for EVERY card as requested
+        cardBills.push({
+          id: `bill-${card.id}-${format(currentDate, 'yyyy-MM')}`,
+          cardId: card.id,
+          name: `Fatura ${card.name}`,
+          amount: totalBillAmount,
+          due_day: dueDay,
+          isCardBill: true,
+          expenseIds: [...cyclePaidExpenses.map((i: any) => i.id)],
+          installmentIds: []
+        });
+        
+        pendingCardTotal += totalBillAmount;
+        
+        // Use totalBillAmount for totalCardSpending to match the breakdown
+        totalCardSpending += totalBillAmount;
+        
+        // Add to breakdown for chart (Focus on what's currently owed/pending for the current bill)
+        if (totalBillAmount > 0) {
+          const bank = banks.find((b: any) => b.id === card.bank_id);
+          let color = bank?.color || '#3b82f6';
+          const bankName = bank?.name?.toLowerCase() || '';
+          if (!bank?.color) {
+            if (bankName.includes('nubank')) color = '#8A05BE';
+            else if (bankName.includes('inter')) color = '#FF7A00';
+            else if (bankName.includes('itau') || bankName.includes('itaú')) color = '#EC7000';
+            else if (bankName.includes('santander')) color = '#CC0000';
+            else if (bankName.includes('bradesco')) color = '#ED1C24';
+          }
+
+          breakdown.push({
+            name: card.name,
+            value: totalBillAmount,
+            color: color
+          });
+        }
+
+        // Add to currentBillExpenses for category chart
+        currentBillExpenses.push(...cyclePaidExpenses, ...cyclePendingExpenses);
+        recurringItems.forEach((rb: any) => {
+          currentBillExpenses.push({
+            ...rb,
+            amount: rb.amount,
+            categories: rb.categories || { name: 'Outros' },
+            payment_method: 'Cartão de Crédito'
+          });
+        });
+        installmentItems.forEach((inst: any) => {
+          const purchase = allCardPurchases.find((p: any) => p.id === inst.purchase_id);
+          currentBillExpenses.push({
+            ...inst,
+            amount: inst.amount,
+            categories: { name: 'Parcelamento' },
+            payment_method: 'Cartão de Crédito'
+          });
+        });
+      });
+
+      // Also add paid card expenses of the current month to total spending and category chart
+      const currentMonthPaidCard = allPaidCardExpenses.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= start && d <= end;
+      });
+      
+      // totalCardSpending was already calculated as sum of all bills (which include paid expenses).
+      // We don't need to add currentMonthPaidCard again.
+      currentBillExpenses.push(...currentMonthPaidCard);
+
+      setCardBreakdown(breakdown.sort((a, b) => b.value - a.value));
+      setCardBillReminders(cardBills);
+
+      // Separate pending non-card expenses
+      const pendingNonCardExpenses = pendingExpenses.filter((e: any) => 
+        e.payment_method !== 'Cartão de Crédito' && e.payment_method !== 'Cartão de crédito'
+      );
+      const currentPendingNonCard = pendingNonCardExpenses.filter((e: any) => new Date(e.date) <= end);
+      setPendingExpenses(currentPendingNonCard);
 
       // Check for unpaid recurring items
       const unpaidRecurringBills = recurringBills.filter((bill: any) => {
-        return !expenses.some((exp: any) => exp.recurring_bill_id === bill.id);
+        const hasPaid = paidExpenses.some((exp: any) => exp.recurring_bill_id === bill.id);
+        const hasPending = pendingExpenses.some((exp: any) => exp.recurring_bill_id === bill.id);
+        return !hasPaid && !hasPending;
       });
       setRecurringBillsReminders(unpaidRecurringBills);
 
@@ -198,31 +331,52 @@ export default function DashboardPage() {
 
       const totalIncome = incomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
-      // Corrected Total Expense: Non-card expenses in calendar month + Total Card Bill for the period
-      const nonCardExpenses = expenses
-        .filter((e: any) => e.payment_method !== 'Cartão de Crédito')
-        .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      
-      const correctedTotalExpense = nonCardExpenses + totalCardSpending;
+      // Total Expense: Only what is actually PAID
+      const totalPaidExpense = paidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
       const totalInvested = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const balance = totalIncome - correctedTotalExpense - totalInvested;
+      const balance = totalIncome - totalPaidExpense - totalInvested;
 
-      // Predicted values
+      // Predicted values:
+      // totalPaidExpense includes paid expenses (both card and non-card).
+      // pendingCardTotal includes ALL card expenses (paid and pending) for the current cycle.
+      // We need: totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal
+      
       const unpaidBillsTotal = unpaidRecurringBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+      const pendingNonCardTotal = currentPendingNonCard.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
       const unpaidIncomesTotal = unpaidRecurringIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+
+      const predictedIncome = totalIncome + unpaidIncomesTotal;
+      
+      // Let's calculate paid card expenses in the current cycle to subtract from pendingCardTotal
+      const paidCardExpensesInCycle = allPaidCardExpenses.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= start && d <= end;
+      }).reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+      
+      const predictedExpense = totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal;
+      const predictedBalance = predictedIncome - predictedExpense - totalInvested;
+
+      console.log('fetchDashboardData: Totals calculated', {
+        totalPaidExpense,
+        unpaidBillsTotal,
+        pendingNonCardTotal,
+        pendingCardTotal,
+        predictedExpense
+      });
 
       setStats({
         totalIncome,
-        totalExpense: correctedTotalExpense,
+        totalExpense: totalPaidExpense,
         totalInvested,
         balance,
         cardSpending: totalCardSpending,
-        predictedIncome: totalIncome + unpaidIncomesTotal,
-        predictedExpense: correctedTotalExpense + unpaidBillsTotal
+        predictedIncome,
+        predictedExpense,
+        predictedBalance
       });
 
-      // Process Chart Data (Daily)
+      // Process Chart Data (Daily) - Only paid expenses
       const daysInMonth = end.getDate();
       const dailyData = Array.from({ length: daysInMonth }, (_, i) => ({
         day: i + 1,
@@ -231,22 +385,22 @@ export default function DashboardPage() {
       }));
 
       incomes.forEach((i: any) => {
-        const day = new Date(i.date).getDate();
+        const day = parseInt(i.date.split('T')[0].split('-')[2], 10);
         if (dailyData[day - 1]) dailyData[day - 1].entradas += Number(i.amount);
       });
 
-      expenses.forEach((i: any) => {
-        const day = new Date(i.date).getDate();
+      paidExpenses.forEach((i: any) => {
+        const day = parseInt(i.date.split('T')[0].split('-')[2], 10);
         if (dailyData[day - 1]) dailyData[day - 1].saidas += Number(i.amount);
       });
 
       setChartData(dailyData);
 
-      // Process Category Data - Including Card Spending and Recurring Bills
+      // Process Category Data - Including Card Spending, Recurring Bills and Pending Expenses
       const catMap: Record<string, number> = {};
       
-      // 1. Non-card expenses of the calendar month
-      expenses
+      // 1. Non-card PAID expenses of the calendar month
+      paidExpenses
         .filter((e: any) => e.payment_method !== 'Cartão de Crédito')
         .forEach((e: any) => {
           const name = e.categories?.name || 'Outros';
@@ -263,6 +417,12 @@ export default function DashboardPage() {
       unpaidRecurringBills.forEach((bill: any) => {
         const name = bill.categories?.name || 'Outros';
         catMap[name] = (catMap[name] || 0) + Number(bill.amount);
+      });
+
+      // 4. Pending expenses for the month (predicted)
+      pendingExpenses.forEach((e: any) => {
+        const name = e.categories?.name || 'Outros';
+        catMap[name] = (catMap[name] || 0) + Number(e.amount);
       });
       
       setCategoryData(Object.entries(catMap)
@@ -285,7 +445,7 @@ export default function DashboardPage() {
           projection.push({
             name: monthName,
             entradas: totalIncome + unpaidIncomesTotal,
-            saidas: correctedTotalExpense + unpaidBillsTotal
+            saidas: totalPaidExpense + unpaidBillsTotal + pendingNonCardTotal + pendingCardTotal
           });
         } else {
           // Future months: recurring only
@@ -342,6 +502,7 @@ export default function DashboardPage() {
   }, [currentDate]);
 
   useEffect(() => {
+    console.log('Dashboard useEffect: currentDate changed', currentDate);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
@@ -390,6 +551,62 @@ export default function DashboardPage() {
       fetchDashboardData(true);
     } catch (error: any) {
       alert(`Erro ao receber receita: ${error.message}`);
+    }
+  };
+
+  const handleConfirmExpensePayment = async (expenseId: string) => {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ 
+          status: 'paid', 
+          paid_at: new Date().toISOString(),
+          date: new Date().toISOString() // Update date to payment date for correct balance impact
+        })
+        .eq('id', expenseId);
+
+      if (error) throw error;
+      fetchDashboardData(true);
+    } catch (error: any) {
+      alert(`Erro ao confirmar pagamento: ${error.message}`);
+    }
+  };
+
+  const handlePayCardBill = async (bill: any) => {
+    if (bill.amount <= 0) {
+      alert('Esta fatura não possui gastos pendentes para pagar.');
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Update expenses table
+      if (bill.expenseIds && bill.expenseIds.length > 0) {
+        const { error: expError } = await supabase
+          .from('expenses')
+          .update({ 
+            status: 'paid', 
+            paid_at: new Date().toISOString(),
+            date: new Date().toISOString()
+          })
+          .in('id', bill.expenseIds);
+        if (expError) throw expError;
+      }
+
+      // 2. Update installments table
+      if (bill.installmentIds && bill.installmentIds.length > 0) {
+        const { error: instError } = await supabase
+          .from('installments')
+          .update({ status: 'paid' })
+          .in('id', bill.installmentIds);
+        if (instError) throw instError;
+      }
+
+      fetchDashboardData(true);
+    } catch (error: any) {
+      alert(`Erro ao pagar fatura: ${error.message}`);
     }
   };
 
@@ -460,7 +677,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <StatCard 
             title="Entradas" 
             value={`R$ ${stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
@@ -482,10 +699,11 @@ export default function DashboardPage() {
             color="blue"
           />
           <StatCard 
-            title="Saldo Final" 
+            title="Saldo Atual" 
             value={`R$ ${stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={CheckCircle2}
             color={stats.balance >= 0 ? 'accent' : 'red'}
+            description={`Previsto: R$ ${stats.predictedBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           />
         </div>
 
@@ -775,38 +993,90 @@ export default function DashboardPage() {
                 Contas a Pagar
               </h3>
               <span className="text-xs font-bold bg-red-500/10 text-red-500 px-2.5 py-1 rounded-full">
-                {recurringBillsReminders.length} Pendentes
+                {recurringBillsReminders.length + pendingExpenses.length + cardBillReminders.length} Pendentes
               </span>
             </div>
             <div className="space-y-4">
-              {recurringBillsReminders.length === 0 ? (
+              {recurringBillsReminders.length === 0 && pendingExpenses.length === 0 && cardBillReminders.length === 0 ? (
                 <div className="py-8 text-center text-text-secondary text-sm italic">
-                  Todas as contas fixas deste mês foram pagas!
+                  Todas as contas deste mês foram pagas!
                 </div>
               ) : (
-                recurringBillsReminders.map((bill) => (
-                  <div key={bill.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-red-500/30 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500">
-                        <ArrowDownRight className="w-5 h-5" />
+                <>
+                  {/* Card Bills */}
+                  {cardBillReminders.map((bill) => (
+                    <div key={bill.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-accent/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                          <CreditCard className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">{bill.name}</p>
+                          <p className="text-xs text-text-secondary">Vence dia {bill.due_day}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold">{bill.name}</p>
-                        <p className="text-xs text-text-secondary">Vence dia {bill.due_day}</p>
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-accent">R$ {bill.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <button 
+                          onClick={() => handlePayCardBill(bill)}
+                          className="p-2 bg-neutral-800 hover:bg-accent hover:text-white rounded-xl transition-all"
+                          title="Pagar fatura"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="font-black text-red-500">R$ {bill.amount.toLocaleString('pt-BR')}</p>
-                      <button 
-                        onClick={() => handlePayBill(bill)}
-                        className="p-2 bg-neutral-800 hover:bg-red-500 hover:text-white rounded-xl transition-all"
-                        title="Marcar como pago"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
+                  ))}
+                  {/* Pending Expenses (One-time) */}
+                  {pendingExpenses.map((expense) => (
+                    <div key={expense.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-yellow-500/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">{expense.description}</p>
+                          <p className="text-xs text-text-secondary">Vencimento: {formatDate(expense.date)}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-yellow-500">R$ {Number(expense.amount).toLocaleString('pt-BR')}</p>
+                        <button 
+                          onClick={() => handleConfirmExpensePayment(expense.id)}
+                          className="p-2 bg-neutral-800 hover:bg-green-500 hover:text-white rounded-xl transition-all"
+                          title="Confirmar pagamento"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+
+                  {/* Recurring Bills */}
+                  {recurringBillsReminders.map((bill) => (
+                    <div key={bill.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-red-500/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500">
+                          <ArrowDownRight className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">{bill.name}</p>
+                          <p className="text-xs text-text-secondary">Vence dia {bill.due_day}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-red-500">R$ {bill.amount.toLocaleString('pt-BR')}</p>
+                        <button 
+                          onClick={() => handlePayBill(bill)}
+                          className="p-2 bg-neutral-800 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                          title="Marcar como pago"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           </Card>

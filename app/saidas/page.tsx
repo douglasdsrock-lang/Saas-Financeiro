@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { handleSupabaseError } from '@/lib/utils';
+import { handleSupabaseError, formatDate } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
 import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw, CreditCard } from 'lucide-react';
@@ -16,8 +16,10 @@ export default function SaidasPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'credit_card' | 'other'>('credit_card');
   const [filters, setFilters] = useState({
-    month: '',
+    startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
     category: '',
     search: '',
     payment_method: '',
@@ -83,11 +85,14 @@ export default function SaidasPage() {
       if (filters.category) query = query.eq('category_id', filters.category);
       if (filters.payment_method) query = query.eq('payment_method', filters.payment_method);
       if (filters.credit_card_id) query = query.eq('credit_card_id', filters.credit_card_id);
-      if (filters.month) {
-        const start = `${filters.month}-01`;
-        const dateObj = new Date(start + 'T00:00:00');
-        const end = format(new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0), 'yyyy-MM-dd');
-        query = query.gte('date', start).lte('date', end);
+      if (filters.startDate && filters.endDate) {
+        query = query.gte('date', filters.startDate).lte('date', filters.endDate);
+      }
+      
+      if (activeTab === 'credit_card') {
+        query = query.eq('payment_method', 'Cartão de Crédito');
+      } else {
+        query = query.neq('payment_method', 'Cartão de Crédito');
       }
       if (filters.search) {
         query = query.ilike('description', `%${filters.search}%`);
@@ -101,7 +106,7 @@ export default function SaidasPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, activeTab]);
 
   useEffect(() => {
     fetchHelpers();
@@ -129,6 +134,7 @@ export default function SaidasPage() {
           payment_method: formData.payment_method,
           credit_card_id: formData.payment_method === 'Cartão de Crédito' ? formData.credit_card_id : null,
           is_fixed: formData.is_fixed || false,
+          status: formData.payment_method === 'Cartão de Crédito' ? 'pending' : (formData.status || 'paid'),
           notes: formData.notes || null,
           user_id: user.id
         };
@@ -179,6 +185,7 @@ export default function SaidasPage() {
             credit_card_id: formData.payment_method === 'Cartão de Crédito' ? formData.credit_card_id : null,
             is_fixed: formData.is_fixed || false,
             recurring_bill_id: recurringBillId,
+            status: formData.payment_method === 'Cartão de Crédito' ? 'pending' : (formData.status || 'paid'),
             notes: formData.notes || null,
             user_id: user.id
           });
@@ -251,17 +258,56 @@ export default function SaidasPage() {
           </div>
         )}
 
+        <div className="flex gap-2 border-b border-border">
+          <button 
+            onClick={() => {
+              setActiveTab('credit_card');
+              setFilters({
+                startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
+                endDate: format(new Date(), 'yyyy-MM-dd'),
+                category: '',
+                search: '',
+                payment_method: '',
+                credit_card_id: ''
+              });
+            }}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === 'credit_card' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary'}`}
+          >
+            Cartão de Crédito
+          </button>
+          <button 
+            onClick={() => {
+              setActiveTab('other');
+              setFilters({
+                startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
+                endDate: format(new Date(), 'yyyy-MM-dd'),
+                category: '',
+                search: '',
+                payment_method: '',
+                credit_card_id: ''
+              });
+            }}
+            className={`px-4 py-2 text-sm font-medium ${activeTab === 'other' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary'}`}
+          >
+            Outros Gastos
+          </button>
+        </div>
+
         <div className="flex flex-wrap gap-4 items-center bg-panel p-4 border border-border rounded-2xl shadow-sm">
-          <div className="relative group">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all cursor-pointer ${filters.month ? 'bg-accent/10 border-accent text-accent' : 'bg-neutral-800/50 border-border text-text-secondary hover:border-accent/50'}`}>
-              <CalendarIcon className="w-5 h-5" />
-              <input 
-                type="month" 
-                value={filters.month}
-                onChange={(e) => setFilters({...filters, month: e.target.value})}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-            </div>
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={filters.startDate}
+              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              className="input-field h-10"
+            />
+            <span className="text-text-secondary">até</span>
+            <input 
+              type="date" 
+              value={filters.endDate}
+              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              className="input-field h-10"
+            />
           </div>
 
           <div className="flex-1 min-w-[200px] relative">
@@ -286,20 +332,7 @@ export default function SaidasPage() {
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
-          <select 
-            value={filters.payment_method}
-            onChange={(e) => setFilters({...filters, payment_method: e.target.value})}
-            className="bg-panel border border-border rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="">Todos Métodos</option>
-            <option value="Dinheiro">Dinheiro</option>
-            <option value="Pix">Pix</option>
-            <option value="Cartão de Crédito">Cartão de Crédito</option>
-            <option value="Cartão de Débito">Cartão de Débito</option>
-            <option value="Boleto">Boleto</option>
-          </select>
-
-          {filters.payment_method === 'Cartão de Crédito' && (
+          {activeTab === 'credit_card' && (
             <select 
               value={filters.credit_card_id}
               onChange={(e) => setFilters({...filters, credit_card_id: e.target.value})}
@@ -311,7 +344,7 @@ export default function SaidasPage() {
           )}
 
           <button 
-            onClick={() => setFilters({ month: '', category: '', search: '', payment_method: '', credit_card_id: '' })}
+            onClick={() => setFilters({ startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'), endDate: format(new Date(), 'yyyy-MM-dd'), category: '', search: '', payment_method: '', credit_card_id: '' })}
             className="text-xs text-text-secondary hover:text-accent"
           >
             Limpar
@@ -336,6 +369,7 @@ export default function SaidasPage() {
                     <th className="pb-4 font-medium">Descrição</th>
                     <th className="pb-4 font-medium">Categoria</th>
                     <th className="pb-4 font-medium">Método</th>
+                    <th className="pb-4 font-medium">Status</th>
                     <th className="pb-4 font-medium">Valor</th>
                     <th className="pb-4 font-medium text-right">Ações</th>
                   </tr>
@@ -344,10 +378,7 @@ export default function SaidasPage() {
                   {data.map((item) => (
                     <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
                       <td className="py-4 text-sm">
-                        {(() => {
-                          const [year, month, day] = item.date.split('T')[0].split('-');
-                          return `${day}/${month}/${year}`;
-                        })()}
+                        {formatDate(item.date)}
                       </td>
                       <td className="py-4 font-medium">
                         <div className="flex items-center gap-2">
@@ -366,6 +397,11 @@ export default function SaidasPage() {
                           {item.payment_method}
                           {item.credit_cards?.name && <span className="text-[10px] text-accent">({item.credit_cards.name})</span>}
                         </div>
+                      </td>
+                      <td className="py-4 text-sm">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${item.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-green-500/10 text-green-500'}`}>
+                          {item.status === 'pending' ? 'Pendente' : 'Pago'}
+                        </span>
                       </td>
                       <td className="py-4 font-bold text-red-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                       <td className="py-4 text-right">
@@ -451,6 +487,15 @@ export default function SaidasPage() {
                   <option value="Boleto">Boleto</option>
                 </select>
               </div>
+              {paymentMethod !== 'Cartão de Crédito' && paymentMethod !== '' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Já foi pago?</label>
+                  <select {...register('status')} className="input-field" defaultValue="paid">
+                    <option value="paid">Sim (Pago)</option>
+                    <option value="pending">Não (Pendente)</option>
+                  </select>
+                </div>
+              )}
               {paymentMethod === 'Cartão de Crédito' && (
                 <>
                   <div>

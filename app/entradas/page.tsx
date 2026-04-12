@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { handleSupabaseError } from '@/lib/utils';
+import { handleSupabaseError, formatDate } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
 import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw } from 'lucide-react';
@@ -267,10 +267,7 @@ export default function EntradasPage() {
                   {data.map((item) => (
                     <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
                       <td className="py-4 text-sm">
-                        {(() => {
-                          const [year, month, day] = item.date.split('T')[0].split('-');
-                          return `${day}/${month}/${year}`;
-                        })()}
+                        {formatDate(item.date)}
                       </td>
                       <td className="py-4 font-medium">{item.description}</td>
                       <td className="py-4 text-sm">

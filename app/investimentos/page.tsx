@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { handleSupabaseError } from '@/lib/utils';
+import { handleSupabaseError, formatDate } from '@/lib/utils';
 import { Card, StatCard } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
 import { Plus, Edit2, Trash2, TrendingUp, Wallet, PieChart, AlertCircle, RefreshCcw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -217,7 +217,7 @@ export default function InvestimentosPage() {
                   <tbody className="divide-y divide-border">
                     {data.map((item) => (
                       <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
-                        <td className="py-4 text-sm">{format(new Date(item.date), 'dd/MM/yyyy')}</td>
+                        <td className="py-4 text-sm">{formatDate(item.date)}</td>
                         <td className="py-4 font-medium">
                           <div>
                             <p>{item.description}</p>

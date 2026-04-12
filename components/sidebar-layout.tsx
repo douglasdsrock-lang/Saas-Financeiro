@@ -122,7 +122,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           </button>
         </header>
 
-        <div className="p-6 lg:p-12 max-w-7xl mx-auto">
+        <div className="p-6 lg:px-8 lg:py-10 max-w-[1800px] mx-auto w-full">
           {children}
         </div>
       </main>

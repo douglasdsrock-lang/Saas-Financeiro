@@ -33,3 +33,9 @@ export function handleSupabaseError(error: any, defaultMsg: string = 'Erro ao ca
   
   return msg;
 }
+
+export function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('T')[0].split('-');
+  return `${day}/${month}/${year}`;
+}
