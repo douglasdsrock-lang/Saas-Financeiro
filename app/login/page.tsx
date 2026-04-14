@@ -44,7 +44,15 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       console.error('Auth error:', error);
-      setError(error.message || 'Erro ao processar autenticação.');
+      let message = 'Erro ao processar autenticação.';
+      if (error.message === 'Invalid login credentials') {
+        message = 'E-mail ou senha incorretos. Por favor, verifique seus dados ou cadastre-se.';
+      } else if (error.message === 'Email not confirmed') {
+        message = 'E-mail não confirmado. Por favor, verifique sua caixa de entrada.';
+      } else {
+        message = error.message || message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
