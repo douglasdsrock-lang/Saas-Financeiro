@@ -1,7 +1,1 @@
-{
-  "name": "SaaS Financeiro",
-  "description": "Sistema de gestão financeira pessoal e empresarial com dashboard, entradas, saídas e investimentos.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}
+{"name":"SaaS Financeiro","description":"Sistema de gestão financeira pessoal e empresarial com dashboard, entradas, saídas e investimentos.","requestFramePermissions":["geolocation"]}
