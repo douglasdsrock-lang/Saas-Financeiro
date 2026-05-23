@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { handleSupabaseError, formatDate } from '@/lib/utils';
 import { Card, StatCard } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
-import { Plus, Edit2, Trash2, TrendingUp, Wallet, PieChart, AlertCircle, RefreshCcw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingUp, Wallet, PieChart, AlertCircle, RefreshCcw, ArrowUpRight, ArrowDownRight, Search } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import SidebarLayout from '@/components/sidebar-layout';
@@ -17,6 +17,12 @@ export default function InvestimentosPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    search: '',
+    category: ''
+  });
   
   const [categories, setCategories] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
@@ -63,11 +69,25 @@ export default function InvestimentosPage() {
       if (authError) throw authError;
       if (!user) return;
 
-      const { data: result, error: fetchError } = await supabase
+      let query = supabase
         .from('investments')
         .select('*, categories(name), banks(name)')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false });
+        .eq('user_id', user.id);
+
+      if (filters.category) {
+        query = query.eq('category_id', filters.category);
+      }
+      if (filters.startDate) {
+        query = query.gte('date', filters.startDate);
+      }
+      if (filters.endDate) {
+        query = query.lte('date', filters.endDate);
+      }
+      if (filters.search) {
+        query = query.ilike('description', `%${filters.search}%`);
+      }
+
+      const { data: result, error: fetchError } = await query.order('date', { ascending: false });
       
       if (fetchError) throw fetchError;
       setData(result || []);
@@ -76,7 +96,7 @@ export default function InvestimentosPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filters]);
 
   useEffect(() => {
     fetchHelpers();
@@ -214,6 +234,61 @@ export default function InvestimentosPage() {
             icon={PieChart}
             color="purple"
           />
+        </div>
+
+        <div className="flex flex-wrap gap-4 items-center bg-panel p-4 border border-border rounded-2xl shadow-sm">
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={filters.startDate}
+              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              onClick={(e) => e.currentTarget.showPicker()}
+              className="bg-panel border border-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+              title="Data Início"
+            />
+            <span className="text-text-secondary text-sm font-semibold">até</span>
+            <input 
+              type="date" 
+              value={filters.endDate}
+              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              onClick={(e) => e.currentTarget.showPicker()}
+              className="bg-panel border border-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+              title="Data Fim"
+            />
+          </div>
+
+          <div className="flex-1 min-w-[200px] relative">
+            <input 
+              type="text"
+              placeholder="Pesquisar ativo/descrição..."
+              value={filters.search}
+              onChange={(e) => setFilters({...filters, search: e.target.value})}
+              className="input-field !pl-10 h-10"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none">
+              <Search className="w-4 h-4" />
+            </div>
+          </div>
+
+          <select 
+            value={filters.category}
+            onChange={(e) => setFilters({...filters, category: e.target.value})}
+            className="bg-panel border border-border rounded-lg px-3 py-2 text-sm focus:ring-accent text-white"
+          >
+            <option value="" className="bg-[#0c0c10] text-white">Todas Categorias</option>
+            {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0c0c10] text-white">{c.name}</option>)}
+          </select>
+
+          <button 
+            onClick={() => setFilters({ startDate: '', endDate: '', search: '', category: '' })}
+            className="text-xs text-text-secondary hover:text-accent transition-colors"
+          >
+            Limpar Filtros
+          </button>
+
+          <div className="ml-auto text-blue-500 font-bold px-4 bg-blue-500/10 py-2 rounded-xl">
+            Total: R$ {totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
