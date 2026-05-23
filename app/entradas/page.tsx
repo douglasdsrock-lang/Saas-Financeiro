@@ -17,7 +17,8 @@ export default function EntradasPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [filters, setFilters] = useState({
-    month: '',
+    startDate: '',
+    endDate: '',
     category: '',
     search: '',
     person: ''
@@ -80,11 +81,11 @@ export default function EntradasPage() {
       
       if (filters.category) query = query.eq('category_id', filters.category);
       if (filters.person) query = query.eq('person_id', filters.person);
-      if (filters.month) {
-        const start = `${filters.month}-01`;
-        const dateObj = new Date(start + 'T00:00:00');
-        const end = format(new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0), 'yyyy-MM-dd');
-        query = query.gte('date', start).lte('date', end);
+      if (filters.startDate) {
+        query = query.gte('date', filters.startDate);
+      }
+      if (filters.endDate) {
+        query = query.lte('date', filters.endDate);
       }
       if (filters.search) {
         query = query.ilike('description', `%${filters.search}%`);
@@ -211,22 +212,24 @@ export default function EntradasPage() {
         )}
 
         <div className="flex flex-wrap gap-4 items-center bg-panel p-4 border border-border rounded-2xl shadow-sm">
-          <div className="relative group">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all cursor-pointer ${filters.month ? 'bg-accent/10 border-accent text-accent' : 'bg-neutral-800/50 border-border text-text-secondary hover:border-accent/50'}`}>
-              <CalendarIcon className="w-5 h-5" />
-              <input 
-                type="month" 
-                value={filters.month}
-                onChange={(e) => setFilters({...filters, month: e.target.value})}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                title="Filtrar por mês"
-              />
-            </div>
-            {filters.month && (
-              <div className="absolute -top-2 -right-2 bg-accent text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase">
-                {filters.month.split('-')[1]}
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={filters.startDate}
+              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+              onClick={(e) => e.currentTarget.showPicker()}
+              className="bg-panel border border-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+              title="Data Início"
+            />
+            <span className="text-text-secondary text-sm font-semibold">até</span>
+            <input 
+              type="date" 
+              value={filters.endDate}
+              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+              onClick={(e) => e.currentTarget.showPicker()}
+              className="bg-panel border border-border rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+              title="Data Fim"
+            />
           </div>
 
           <div className="flex-1 min-w-[200px] relative">
@@ -261,7 +264,7 @@ export default function EntradasPage() {
           </select>
 
           <button 
-            onClick={() => setFilters({ month: '', category: '', search: '', person: '' })}
+            onClick={() => setFilters({ startDate: '', endDate: '', category: '', search: '', person: '' })}
             className="text-xs text-text-secondary hover:text-accent transition-colors"
           >
             Limpar Filtros
