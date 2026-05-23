@@ -151,6 +151,21 @@ export default function DashboardPage() {
         throw new Error('Dados críticos não foram carregados corretamente.');
       }
 
+      // Legacy cleanup: if there are no credit card expenses, delete all installments and card purchases
+      // to prevent orphaned seed data from showing up.
+      const hasAnyCardExpenses = allPaidExpenses.some((e: any) => e.credit_card_id !== null) || 
+                                pendingExpenses.some((e: any) => e.credit_card_id !== null);
+      if (!hasAnyCardExpenses && (pendingInstallments.length > 0 || allCardPurchases.length > 0)) {
+        console.log('Cleaning up legacy seed installments and card purchases...');
+        await Promise.all([
+          supabase.from('installments').delete().eq('user_id', user.id),
+          supabase.from('card_purchases').delete().eq('user_id', user.id)
+        ]);
+        // Trigger a reload of data to reflect the changes
+        setTimeout(() => fetchDashboardData(true), 200);
+        return;
+      }
+
       const isStatementPayment = (e: any) => 
         e.credit_card_id !== null && 
         e.payment_method !== 'Cartão de Crédito' && 
@@ -483,16 +498,37 @@ export default function DashboardPage() {
       }
       setProjectionData(projection);
 
-      // Process Card Debt (Future Installments)
+      // Process Card Debt (Future Installments + Future Card Expenses)
       const debtMap: Record<string, number> = {};
       
+      // 1. Process from pendingInstallments (legacy/fallback)
       pendingInstallments.forEach((inst: any) => {
-        // Consider all pending installments as debt
         const purchase = allCardPurchases.find((p: any) => p.id === inst.purchase_id);
         if (purchase) {
           const cardId = purchase.card_id;
           debtMap[cardId] = (debtMap[cardId] || 0) + Number(inst.amount);
         }
+      });
+
+      // 2. Process from future card expenses (from the expenses table)
+      creditCards.forEach((card: any) => {
+        const dueDay = card.due_day || 10;
+        const closingDay = card.closing_day || (dueDay > 7 ? dueDay - 7 : 1);
+        const cardCycleEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), closingDay, 23, 59, 59);
+
+        // Filter paid and pending expenses for this card that fall after the current billing cycle
+        const futurePaid = allPaidExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return e.credit_card_id === card.id && d > cardCycleEnd;
+        });
+
+        const futurePending = pendingExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return e.credit_card_id === card.id && d > cardCycleEnd;
+        });
+
+        const futureTotal = [...futurePaid, ...futurePending].reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+        debtMap[card.id] = (debtMap[card.id] || 0) + futureTotal;
       });
 
       const debtData = creditCards.map((card: any) => {
