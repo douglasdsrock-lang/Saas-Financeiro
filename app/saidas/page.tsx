@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { handleSupabaseError, formatDate, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
@@ -17,6 +17,7 @@ export default function SaidasPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'credit_card' | 'other'>('credit_card');
+  const refMonthRef = useRef<HTMLInputElement>(null);
   const [filters, setFilters] = useState({
     startDate: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
     endDate: format(new Date(), 'yyyy-MM-dd'),
@@ -668,6 +669,7 @@ export default function SaidasPage() {
                       type="date" 
                       value={filters.startDate}
                       onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                      onClick={(e) => e.currentTarget.showPicker()}
                       className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
                     />
                     <span className="text-text-secondary text-sm font-semibold">até</span>
@@ -675,6 +677,7 @@ export default function SaidasPage() {
                       type="date" 
                       value={filters.endDate}
                       onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                      onClick={(e) => e.currentTarget.showPicker()}
                       className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
                     />
                   </div>
@@ -686,18 +689,23 @@ export default function SaidasPage() {
                     onChange={(e) => setFilters({...filters, credit_card_id: e.target.value})}
                     className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer min-w-[180px]"
                   >
-                    <option value="" className="bg-[#0c0c10] text-white">Selecione o Cartão...</option>
+                    <option value="" className="bg-[#0c0c10] text-white">Todos os Cartões</option>
                     {creditCards.map(cc => <option key={cc.id} value={cc.id} className="bg-[#0c0c10] text-white">{cc.name}</option>)}
                   </select>
 
-                  {filters.credit_card_id && (
+                  {filters.credit_card_id ? (
                     <div className="relative group">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl border border-white/[0.04] text-text-secondary hover:border-accent/40 hover:text-white bg-panel/30 transition-all cursor-pointer">
+                      <div 
+                        onClick={() => refMonthRef.current?.showPicker()}
+                        className="flex items-center justify-center w-10 h-10 rounded-xl border border-white/[0.04] text-text-secondary hover:border-accent/40 hover:text-white bg-panel/30 transition-all cursor-pointer"
+                      >
                         <CalendarIcon className="w-5 h-5" />
                         <input 
+                          ref={refMonthRef}
                           type="month" 
                           value={referenceMonth}
                           onChange={(e) => setReferenceMonth(e.target.value)}
+                          onClick={(e) => e.stopPropagation()} // Prevent double trigger
                           className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                           title="Mês de Referência da Fatura"
                         />
@@ -707,6 +715,26 @@ export default function SaidasPage() {
                           {referenceMonth.split('-')[1]}
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="date" 
+                        value={filters.startDate}
+                        onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                        onClick={(e) => e.currentTarget.showPicker()}
+                        className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+                        title="Data Início"
+                      />
+                      <span className="text-text-secondary text-sm font-semibold">até</span>
+                      <input 
+                        type="date" 
+                        value={filters.endDate}
+                        onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                        onClick={(e) => e.currentTarget.showPicker()}
+                        className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer"
+                        title="Data Fim"
+                      />
                     </div>
                   )}
                 </>
