@@ -129,7 +129,7 @@ export default function DashboardPage() {
         categories
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
-        fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr).lte('date', endStr)),
+        fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr)),
         fetchTable('pending_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('investments', supabase.from('investments').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('recurring_bills', supabase.from('recurring_bills').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
