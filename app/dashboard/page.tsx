@@ -65,6 +65,7 @@ export default function DashboardPage() {
   const [recurringBillsReminders, setRecurringBillsReminders] = useState<any[]>([]);
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
   const [cardBillReminders, setCardBillReminders] = useState<any[]>([]);
+  const [activeBudgets, setActiveBudgets] = useState<any[]>([]);
 
   const fetchDashboardData = React.useCallback(async (isBackground = false) => {
     console.log('fetchDashboardData: Starting...', { isBackground, currentDate: currentDate.toISOString() });
@@ -124,7 +125,8 @@ export default function DashboardPage() {
         creditCards,
         banks,
         pendingInstallments,
-        allCardPurchases
+        allCardPurchases,
+        categories
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr).lte('date', endStr)),
@@ -135,7 +137,8 @@ export default function DashboardPage() {
         fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
         fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
         fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
-        fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id))
+        fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id)),
+        fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id))
       ]);
 
       console.log('fetchDashboardData: Promise.all finished', {
@@ -148,10 +151,25 @@ export default function DashboardPage() {
         throw new Error('Dados críticos não foram carregados corretamente.');
       }
 
-      // Filter paid expenses for the calendar month stats
+      const isStatementPayment = (e: any) => 
+        e.credit_card_id !== null && 
+        e.payment_method !== 'Cartão de Crédito' && 
+        e.payment_method !== 'Cartão de crédito';
+
+      const isCardBillPaid = (cardId: string) => {
+        return allPaidExpenses.some((e: any) => {
+          const d = new Date(e.date);
+          return e.credit_card_id === cardId && 
+                 e.payment_method !== 'Cartão de Crédito' && 
+                 e.payment_method !== 'Cartão de crédito' &&
+                 d >= start && d <= end;
+        });
+      };
+
+      // Filter paid expenses for the calendar month stats (excluding statement payments)
       const paidExpenses = allPaidExpenses.filter((e: any) => {
         const d = new Date(e.date);
-        return d >= start && d <= end;
+        return d >= start && d <= end && !isStatementPayment(e);
       });
 
       console.log('fetchDashboardData: Data fetched, processing...', { 
@@ -166,6 +184,7 @@ export default function DashboardPage() {
       const cardBills: any[] = [];
       let pendingCardTotal = 0;
       let totalCardSpending = 0;
+      let paidCardExpensesInCycle = 0;
       const breakdown: any[] = [];
       const currentBillExpenses: any[] = [];
       
@@ -234,23 +253,35 @@ export default function DashboardPage() {
         });
 
         const paidTotal = cyclePaidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+        const pendingTotal = cyclePendingExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
         
-        const totalBillAmount = paidTotal;
+        const totalBillAmount = paidTotal + pendingTotal;
         const totalSpentInCycle = totalBillAmount;
+        
+        const isPaid = isCardBillPaid(card.id);
         
         // Generate a bill for EVERY card as requested
         cardBills.push({
           id: `bill-${card.id}-${format(currentDate, 'yyyy-MM')}`,
           cardId: card.id,
           name: `Fatura ${card.name}`,
+          cardName: card.name,
+          holderId: card.holder_id,
           amount: totalBillAmount,
           due_day: dueDay,
           isCardBill: true,
-          expenseIds: [...cyclePaidExpenses.map((i: any) => i.id)],
-          installmentIds: []
+          expenseIds: [...cyclePaidExpenses.map((i: any) => i.id), ...cyclePendingExpenses.map((i: any) => i.id)],
+          installmentIds: [],
+          isPaid: isPaid
         });
         
-        pendingCardTotal += totalBillAmount;
+        if (!isPaid) {
+          pendingCardTotal += totalBillAmount;
+          paidCardExpensesInCycle += cyclePaidExpenses.filter((e: any) => {
+            const d = new Date(e.date);
+            return d >= start && d <= end;
+          }).reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+        }
         
         // Use totalBillAmount for totalCardSpending to match the breakdown
         totalCardSpending += totalBillAmount;
@@ -307,7 +338,7 @@ export default function DashboardPage() {
       currentBillExpenses.push(...currentMonthPaidCard);
 
       setCardBreakdown(breakdown.sort((a, b) => b.value - a.value));
-      setCardBillReminders(cardBills);
+      setCardBillReminders(cardBills.filter(bill => !bill.isPaid && bill.amount > 0));
 
       // Separate pending non-card expenses
       const pendingNonCardExpenses = pendingExpenses.filter((e: any) => 
@@ -331,7 +362,7 @@ export default function DashboardPage() {
 
       const totalIncome = incomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
-      // Total Expense: Only what is actually PAID
+      // Total Expense: Only what is actually PAID (excluding statement payments since they are filtered in paidExpenses)
       const totalPaidExpense = paidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
       const totalInvested = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
@@ -339,7 +370,7 @@ export default function DashboardPage() {
 
       // Predicted values:
       // totalPaidExpense includes paid expenses (both card and non-card).
-      // pendingCardTotal includes ALL card expenses (paid and pending) for the current cycle.
+      // pendingCardTotal includes ONLY unpaid card bills for the current cycle.
       // We need: totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal
       
       const unpaidBillsTotal = unpaidRecurringBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
@@ -347,12 +378,6 @@ export default function DashboardPage() {
       const unpaidIncomesTotal = unpaidRecurringIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
       const predictedIncome = totalIncome + unpaidIncomesTotal;
-      
-      // Let's calculate paid card expenses in the current cycle to subtract from pendingCardTotal
-      const paidCardExpensesInCycle = allPaidCardExpenses.filter((e: any) => {
-        const d = new Date(e.date);
-        return d >= start && d <= end;
-      }).reduce((sum: number, e: any) => sum + Number(e.amount), 0);
       
       const predictedExpense = totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal;
       const predictedBalance = predictedIncome - predictedExpense - totalInvested;
@@ -492,6 +517,48 @@ export default function DashboardPage() {
       setCardDebtData(debtData);
 
       setRecurringIncomesReminders(unpaidRecurringIncomes);
+
+      // Calculate Category Budgets
+      let budgets: Record<string, number> = {};
+      if (typeof window !== 'undefined') {
+        try {
+          budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
+        } catch (e) {
+          console.error('Error loading category budgets on dashboard:', e);
+        }
+      }
+
+      const targetMonthExpenses = [
+        ...allPaidExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return d >= start && d <= end && !isStatementPayment(e);
+        }),
+        ...pendingExpenses.filter((e: any) => {
+          const d = new Date(e.date);
+          return d >= start && d <= end;
+        })
+      ];
+
+      const activeBudgetsData = categories
+        .filter((c: any) => budgets[c.id] !== undefined)
+        .map((c: any) => {
+          const limit = budgets[c.id];
+          const spent = targetMonthExpenses
+            .filter((e: any) => e.category_id === c.id)
+            .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+          const percent = limit > 0 ? (spent / limit) * 100 : 0;
+          
+          return {
+            id: c.id,
+            name: c.name,
+            limit,
+            spent,
+            percent
+          };
+        });
+
+      setActiveBudgets(activeBudgetsData);
+
       console.log('fetchDashboardData: Success');
     } catch (error: any) {
       console.error('fetchDashboardData: Error', error);
@@ -521,6 +588,7 @@ export default function DashboardPage() {
         credit_card_id: bill.credit_card_id,
         is_fixed: true,
         recurring_bill_id: bill.id,
+        status: 'paid',
         user_id: user.id
       }]);
 
@@ -560,7 +628,6 @@ export default function DashboardPage() {
         .from('expenses')
         .update({ 
           status: 'paid', 
-          paid_at: new Date().toISOString(),
           date: new Date().toISOString() // Update date to payment date for correct balance impact
         })
         .eq('id', expenseId);
@@ -582,20 +649,44 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Update expenses table
+      // 1. Fetch categories to find a suitable one (e.g. "Outros" or "Cartão de Crédito")
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('type', 'expense');
+      
+      const categoryId = categories?.find((c: any) => c.name.toLowerCase().includes('outros'))?.id ||
+                         categories?.find((c: any) => c.name.toLowerCase().includes('cartão'))?.id ||
+                         categories?.[0]?.id;
+
+      // 2. Insert card statement payment expense
+      const { error: insertError } = await supabase.from('expenses').insert([{
+        description: `Pagamento Fatura ${bill.cardName}`,
+        amount: bill.amount,
+        date: `${format(new Date(), 'yyyy-MM-dd')}T12:00:00`,
+        category_id: categoryId,
+        person_id: bill.holderId,
+        payment_method: 'Pix',
+        credit_card_id: bill.cardId,
+        is_fixed: false,
+        status: 'paid',
+        user_id: user.id
+      }]);
+      if (insertError) throw insertError;
+
+      // 3. Update individual expenses under this bill to 'paid' (KEEPING original dates!)
       if (bill.expenseIds && bill.expenseIds.length > 0) {
         const { error: expError } = await supabase
           .from('expenses')
           .update({ 
-            status: 'paid', 
-            paid_at: new Date().toISOString(),
-            date: new Date().toISOString()
+            status: 'paid'
           })
           .in('id', bill.expenseIds);
         if (expError) throw expError;
       }
 
-      // 2. Update installments table
+      // 4. Update installments table
       if (bill.installmentIds && bill.installmentIds.length > 0) {
         const { error: instError } = await supabase
           .from('installments')
@@ -657,20 +748,20 @@ export default function DashboardPage() {
             <p className="text-text-secondary font-medium">Bem-vindo ao seu controle financeiro inteligente.</p>
           </div>
           
-          <div className="flex items-center bg-panel border border-border rounded-2xl p-1.5 shadow-sm">
+          <div className="flex items-center bg-panel/30 backdrop-blur-md border border-white/[0.04] rounded-2xl p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
             <button 
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-2 hover:bg-neutral-800 rounded-xl transition-all text-text-secondary hover:text-white"
+              className="p-2 hover:bg-white/[0.05] rounded-xl transition-all text-text-secondary hover:text-white cursor-pointer"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <div className="px-6 flex items-center gap-2 font-bold min-w-[160px] justify-center">
+            <div className="px-6 flex items-center gap-2 font-display font-bold min-w-[160px] justify-center text-white">
               <Calendar className="w-4 h-4 text-accent" />
               {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
             </div>
             <button 
               onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-2 hover:bg-neutral-800 rounded-xl transition-all text-text-secondary hover:text-white"
+              className="p-2 hover:bg-white/[0.05] rounded-xl transition-all text-text-secondary hover:text-white cursor-pointer"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -744,16 +835,17 @@ export default function DashboardPage() {
                   />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: '#141414', 
-                      border: '1px solid #262626',
+                      backgroundColor: 'rgba(13, 13, 18, 0.85)', 
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: '16px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)'
                     }}
                     itemStyle={{ color: '#fff' }}
                     labelStyle={{ color: '#fff' }}
                     wrapperStyle={{ zIndex: 1000 }}
                     formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
-                    cursor={{ fill: '#262626', opacity: 0.4 }}
+                    cursor={{ fill: 'rgba(255,255,255,0.03)', opacity: 0.4 }}
                   />
                   <Bar dataKey="entradas" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={45} />
                   <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={45} />
@@ -817,8 +909,8 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-          <Card className="shadow-xl shadow-black/20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          <Card className="lg:col-span-2 shadow-xl shadow-black/20">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold">Gastos por Categoria</h3>
               <div className="p-2 bg-accent/10 rounded-xl text-accent">
@@ -845,10 +937,11 @@ export default function DashboardPage() {
                         </Pie>
                         <Tooltip 
                           contentStyle={{ 
-                            backgroundColor: '#141414', 
-                            border: '1px solid #262626',
+                            backgroundColor: 'rgba(13, 13, 18, 0.85)', 
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '16px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)'
                           }}
                           itemStyle={{ color: '#fff' }}
                           labelStyle={{ color: '#fff' }}
@@ -934,10 +1027,11 @@ export default function DashboardPage() {
                         </Pie>
                         <Tooltip 
                           contentStyle={{ 
-                            backgroundColor: '#141414', 
-                            border: '1px solid #262626',
+                            backgroundColor: 'rgba(13, 13, 18, 0.85)', 
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '16px',
-                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                            boxShadow: '0 12px 30px rgba(0, 0, 0, 0.5)'
                           }}
                           itemStyle={{ color: '#fff' }}
                           labelStyle={{ color: '#fff' }}
@@ -981,6 +1075,65 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
+          </Card>
+
+          <Card className="lg:col-span-3 shadow-xl shadow-black/20 border border-white/5">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-accent/10 rounded-2xl text-accent shadow-inner">
+                  <Target className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl">Orçamentos por Categoria</h3>
+                  <p className="text-xs text-text-secondary">Acompanhamento dos limites mensais definidos</p>
+                </div>
+              </div>
+            </div>
+            
+            {activeBudgets.length === 0 ? (
+              <div className="py-8 text-center text-text-secondary text-sm italic">
+                Nenhum limite de orçamento configurado. Configure limites na aba de Categorias em Cadastros.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeBudgets.map((b) => {
+                  let progressColor = "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]";
+                  let textColor = "text-green-500";
+                  if (b.percent >= 90) {
+                    progressColor = "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]";
+                    textColor = "text-red-500";
+                  } else if (b.percent >= 70) {
+                    progressColor = "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.3)]";
+                    textColor = "text-amber-500";
+                  }
+                  
+                  return (
+                    <div key={b.id} className="p-4 bg-background/40 border border-border/50 rounded-2xl space-y-3 hover:border-accent/20 transition-all duration-300">
+                      <div className="flex justify-between items-center text-sm font-semibold">
+                        <span className="text-text font-bold">{b.name}</span>
+                        <span className={`font-black ${textColor}`}>
+                          {b.percent.toFixed(0)}%
+                        </span>
+                      </div>
+                      
+                      <div className="w-full bg-neutral-900/60 border border-white/5 rounded-full h-2.5 overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(b.percent, 100)}%` }}
+                          transition={{ duration: 0.8 }}
+                          className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-between text-[11px] font-medium text-text-secondary">
+                        <span>R$ {b.spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span>Limite: R$ {b.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </div>
 
