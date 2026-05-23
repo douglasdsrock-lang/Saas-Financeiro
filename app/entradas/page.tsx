@@ -19,7 +19,8 @@ export default function EntradasPage() {
   const [filters, setFilters] = useState({
     month: '',
     category: '',
-    search: ''
+    search: '',
+    person: ''
   });
   
   const [people, setPeople] = useState<any[]>([]);
@@ -29,6 +30,10 @@ export default function EntradasPage() {
   const { register, handleSubmit, reset, setValue } = useForm();
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Bulk Selection States
+  const [selectedIncomeIds, setSelectedIncomeIds] = useState<string[]>([]);
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
 
   const fetchHelpers = React.useCallback(async () => {
     try {
@@ -62,6 +67,7 @@ export default function EntradasPage() {
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSelectedIncomeIds([]);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError) throw authError;
@@ -73,6 +79,7 @@ export default function EntradasPage() {
         .eq('user_id', user.id);
       
       if (filters.category) query = query.eq('category_id', filters.category);
+      if (filters.person) query = query.eq('person_id', filters.person);
       if (filters.month) {
         const start = `${filters.month}-01`;
         const dateObj = new Date(start + 'T00:00:00');
@@ -160,6 +167,18 @@ export default function EntradasPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    try {
+      const { error } = await supabase.from('incomes').delete().in('id', selectedIncomeIds);
+      if (error) throw error;
+      setSelectedIncomeIds([]);
+      setIsBulkDeleteConfirmOpen(false);
+      await fetchData();
+    } catch (error: any) {
+      console.error('Error bulk deleting incomes:', error);
+    }
+  };
+
   const total = data.reduce((sum, item) => sum + Number(item.amount), 0);
 
   return (
@@ -232,8 +251,17 @@ export default function EntradasPage() {
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
+          <select 
+            value={filters.person}
+            onChange={(e) => setFilters({...filters, person: e.target.value})}
+            className="bg-panel border border-border rounded-lg px-3 py-2 text-sm focus:ring-accent"
+          >
+            <option value="">Todas Pessoas</option>
+            {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+
           <button 
-            onClick={() => setFilters({ month: '', category: '', search: '' })}
+            onClick={() => setFilters({ month: '', category: '', search: '', person: '' })}
             className="text-xs text-text-secondary hover:text-accent transition-colors"
           >
             Limpar Filtros
@@ -254,6 +282,20 @@ export default function EntradasPage() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-border text-sm text-text-secondary">
+                    <th className="pb-4 w-10">
+                      <input 
+                        type="checkbox"
+                        checked={data.length > 0 && selectedIncomeIds.length === data.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIncomeIds(data.map(item => item.id));
+                          } else {
+                            setSelectedIncomeIds([]);
+                          }
+                        }}
+                        className="checkbox-custom"
+                      />
+                    </th>
                     <th className="pb-4 font-medium">Data</th>
                     <th className="pb-4 font-medium">Descrição</th>
                     <th className="pb-4 font-medium">Categoria</th>
@@ -266,6 +308,20 @@ export default function EntradasPage() {
                 <tbody className="divide-y divide-border">
                   {data.map((item) => (
                     <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
+                      <td className="py-4">
+                        <input 
+                          type="checkbox"
+                          checked={selectedIncomeIds.includes(item.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIncomeIds(prev => [...prev, item.id]);
+                            } else {
+                              setSelectedIncomeIds(prev => prev.filter(id => id !== item.id));
+                            }
+                          }}
+                          className="checkbox-custom"
+                        />
+                      </td>
                       <td className="py-4 text-sm">
                         {formatDate(item.date)}
                       </td>
@@ -322,6 +378,45 @@ export default function EntradasPage() {
             </div>
           </div>
         </Modal>
+
+        {/* Bulk Delete Confirmation Modal */}
+        <Modal 
+          isOpen={isBulkDeleteConfirmOpen} 
+          onClose={() => setIsBulkDeleteConfirmOpen(false)} 
+          title="Confirmar Exclusão em Massa"
+        >
+          <div className="space-y-6">
+            <p className="text-text-secondary text-center">
+              Tem certeza que deseja excluir as <strong>{selectedIncomeIds.length}</strong> entradas selecionadas? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-4">
+              <button onClick={() => setIsBulkDeleteConfirmOpen(false)} className="flex-1 btn-secondary">Cancelar</button>
+              <button onClick={handleBulkDelete} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors">Excluir Todas</button>
+            </div>
+          </div>
+        </Modal>
+
+        {selectedIncomeIds.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-neutral-950/80 backdrop-blur-xl border border-border/80 px-6 py-4 rounded-2xl flex items-center gap-6 shadow-2xl animate-fade-in-up">
+            <span className="text-sm font-semibold text-text">
+              {selectedIncomeIds.length} {selectedIncomeIds.length === 1 ? 'item selecionado' : 'itens selecionados'}
+            </span>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setIsBulkDeleteConfirmOpen(true)}
+                className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-red-500/30 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Excluir
+              </button>
+              <button 
+                onClick={() => setSelectedIncomeIds([])}
+                className="px-3 py-2 hover:bg-neutral-800 text-text-secondary hover:text-text font-bold rounded-xl text-xs transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
         <Modal 
           isOpen={isModalOpen} 
