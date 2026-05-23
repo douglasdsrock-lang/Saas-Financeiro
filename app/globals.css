@@ -1,43 +1,112 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0a0a;
-  --color-foreground: #ffffff;
-  --color-panel: #141414;
-  --color-border: #262626;
-  --color-accent: #22c55e;
-  --color-text-secondary: #a3a3a3;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  
+  --color-background: #050508;
+  --color-foreground: #fcfcfd;
+  --color-panel: #0d0d12;
+  --color-border: #1c1c24;
+  --color-accent: #10b981;
+  --color-text-secondary: #8b8f9a;
 }
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ffffff;
-  --panel: #141414;
-  --border: #262626;
-  --accent: #22c55e;
-  --text-secondary: #a3a3a3;
+  --background: #050508;
+  --foreground: #fcfcfd;
+  --panel: #0d0d12;
+  --border: #1c1c24;
+  --accent: #10b981;
+  --text-secondary: #8b8f9a;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: 'Inter', sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), sans-serif;
+}
+
+/* Custom premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-accent hover:bg-accent/90 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-accent/20 active:scale-95;
+    @apply bg-accent hover:bg-accent/90 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-[0_4px_20px_-4px_rgba(16,185,129,0.3)] active:scale-95 cursor-pointer;
   }
   
   .btn-secondary {
-    @apply bg-panel hover:bg-neutral-800 text-white font-medium py-3 px-6 rounded-xl border border-border transition-all active:scale-95;
+    @apply bg-neutral-900/40 hover:bg-neutral-800/60 text-white font-medium py-3 px-6 rounded-2xl border border-border transition-all active:scale-95 cursor-pointer backdrop-blur-md;
   }
 
   .input-field {
-    @apply w-full bg-panel border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all text-white placeholder:text-neutral-600;
+    @apply w-full bg-neutral-950/60 border border-border rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent/60 transition-all text-white placeholder:text-neutral-600 backdrop-blur-md;
   }
 
   .card {
-    @apply bg-panel border border-border rounded-2xl p-6 shadow-sm;
+    @apply backdrop-blur-xl bg-panel/30 border border-white/[0.04] rounded-3xl p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300 hover:border-white/[0.08] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.8)] hover:-translate-y-0.5;
   }
 }
+
+.checkbox-custom {
+  appearance: none;
+  width: 1.125rem; /* 18px */
+  height: 1.125rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(5, 5, 8, 0.6);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.checkbox-custom:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
+}
+
+.checkbox-custom:checked {
+  background-color: var(--color-accent, #10b981);
+  border-color: var(--color-accent, #10b981);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+}
+
+.checkbox-custom::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: #050508;
+  transform: scale(0);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+}
+
+.checkbox-custom:checked::after {
+  transform: scale(1);
+}
+
