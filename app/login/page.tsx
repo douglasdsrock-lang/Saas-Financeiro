@@ -59,26 +59,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background glow specific to login */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[120px] pointer-events-none z-0" />
+      
+      <div className="max-w-md w-full relative z-10 backdrop-blur-xl bg-panel/30 border border-white/[0.04] rounded-3xl p-8 shadow-[0_24px_50px_-12px_rgba(0,0,0,0.5)] space-y-8">
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mx-auto text-accent mb-6 shadow-xl shadow-accent/5">
-            <Wallet className="w-10 h-10" />
+          <div className="w-16 h-16 bg-gradient-to-tr from-accent to-emerald-400 rounded-2xl flex items-center justify-center mx-auto text-white mb-4 shadow-lg shadow-accent/20 relative group hover:scale-105 transition-all">
+            <Wallet className="w-8 h-8" />
+            <div className="absolute inset-0 rounded-2xl bg-accent/20 blur-md opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none" />
           </div>
-          <h1 className="text-4xl font-black tracking-tight">SaaS Financeiro</h1>
-          <p className="text-text-secondary text-lg">Gerencie suas finanças de forma inteligente e simples.</p>
+          <h1 className="text-3xl font-display font-black tracking-tight bg-gradient-to-r from-white to-neutral-400 bg-clip-text text-transparent">SaaS Financeiro</h1>
+          <p className="text-text-secondary text-sm">Gerencie suas finanças de forma inteligente e simples.</p>
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-500 text-sm animate-in fade-in slide-in-from-top-2">
+          <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-400 text-sm animate-in fade-in slide-in-from-top-2">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <p>{error}</p>
+            <p className="font-medium">{error}</p>
           </div>
         )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-text-secondary ml-1">E-mail</label>
+            <label className="text-xs font-bold text-text-secondary tracking-wider uppercase ml-1">E-mail</label>
             <input
               type="email"
               value={email}
@@ -89,7 +93,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-text-secondary ml-1">Senha</label>
+            <label className="text-xs font-bold text-text-secondary tracking-wider uppercase ml-1">Senha</label>
             <input
               type="password"
               value={password}
@@ -103,7 +107,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full btn-primary py-4 mt-4"
+            className="w-full btn-primary py-3.5 mt-4 text-sm font-semibold tracking-wide uppercase cursor-pointer"
           >
             {loading ? 'Processando...' : isSignUp ? 'Criar Conta' : 'Entrar'}
           </button>
@@ -112,15 +116,17 @@ export default function LoginPage() {
         <div className="text-center">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-accent font-bold hover:underline"
+            className="text-accent/95 hover:text-accent font-semibold text-sm hover:underline cursor-pointer transition-all"
           >
             {isSignUp ? 'Já tem uma conta? Entre aqui' : 'Não tem uma conta? Cadastre-se'}
           </button>
         </div>
 
-        <p className="text-center text-xs text-text-secondary pt-4">
-          Ao entrar, você concorda com nossos Termos de Uso e Política de Privacidade.
-        </p>
+        <div className="border-t border-white/[0.04] pt-4">
+          <p className="text-center text-[10px] leading-relaxed text-text-secondary max-w-[280px] mx-auto">
+            Ao entrar, você concorda com nossos Termos de Uso e Política de Privacidade.
+          </p>
+        </div>
       </div>
     </div>
   );
