@@ -33,19 +33,19 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = 'ma
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/75 backdrop-blur-md"
           />
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className={`relative w-full ${maxWidth} bg-panel border border-border rounded-3xl shadow-2xl overflow-hidden`}
+            exit={{ opacity: 0, scale: 0.96, y: 15 }}
+            className={`relative w-full ${maxWidth} bg-panel/90 border border-white/[0.06] rounded-3xl shadow-[0_24px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden backdrop-blur-2xl`}
           >
-            <div className="flex items-center justify-between p-6 border-b border-border bg-panel/50 backdrop-blur-md sticky top-0 z-10">
-              <h3 className="text-xl font-bold">{title}</h3>
+            <div className="flex items-center justify-between p-6 border-b border-white/[0.04] bg-panel/30 backdrop-blur-md sticky top-0 z-10">
+              <h3 className="text-xl font-display font-black tracking-tight text-white">{title}</h3>
               <button 
                 onClick={onClose}
-                className="p-2 hover:bg-neutral-800 rounded-xl text-text-secondary transition-all"
+                className="p-2 hover:bg-white/5 rounded-xl text-text-secondary hover:text-white transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
