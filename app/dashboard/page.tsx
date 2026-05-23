@@ -151,11 +151,9 @@ export default function DashboardPage() {
         throw new Error('Dados críticos não foram carregados corretamente.');
       }
 
-      // Legacy cleanup: if there are no credit card expenses, delete all installments and card purchases
-      // to prevent orphaned seed data from showing up.
-      const hasAnyCardExpenses = allPaidExpenses.some((e: any) => e.credit_card_id !== null) || 
-                                pendingExpenses.some((e: any) => e.credit_card_id !== null);
-      if (!hasAnyCardExpenses && (pendingInstallments.length > 0 || allCardPurchases.length > 0)) {
+      // Legacy cleanup: delete all installments and card purchases for this user
+      // because they are legacy seed tables and not used by the current creation flow.
+      if (pendingInstallments.length > 0 || allCardPurchases.length > 0) {
         console.log('Cleaning up legacy seed installments and card purchases...');
         await Promise.all([
           supabase.from('installments').delete().eq('user_id', user.id),
