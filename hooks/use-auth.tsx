@@ -48,13 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
           console.error('AuthProvider: getSession error:', error);
-          throw error;
+        } else {
+          console.log('AuthProvider: Session retrieved:', session ? 'User logged in' : 'No session');
+          if (mounted) setUser(session?.user ?? null);
         }
-        console.log('AuthProvider: Session retrieved:', session ? 'User logged in' : 'No session');
-        if (mounted) setUser(session?.user ?? null);
       } catch (error: any) {
         console.error('AuthProvider: Error in getSession:', error);
-        // handleSupabaseError(error, 'Erro ao verificar sessão.');
       } finally {
         console.log('AuthProvider: Finalizing initialization');
         clearTimeout(timeout);
@@ -70,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
       console.log('AuthProvider: Auth state changed:', event, session ? 'User logged in' : 'No session');
       if (mounted) {
         setUser(session?.user ?? null);

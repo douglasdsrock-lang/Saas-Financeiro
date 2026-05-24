@@ -44,6 +44,19 @@ export default function CadastrosPage() {
 
   const { register, handleSubmit, reset, setValue, watch } = useForm();
   const paymentMethod = watch('payment_method');
+  const categoryType = watch('type');
+  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
+        setCategoryBudgets(budgets);
+      } catch (e) {
+        console.error('Error parsing category_budgets:', e);
+      }
+    }
+  }, [activeTab, data]);
 
   const tabs = [
     { id: 'people', name: 'Pessoas', icon: Users },
@@ -155,12 +168,31 @@ export default function CadastrosPage() {
 
       console.log(`Saving to ${activeTab}:`, finalPayload);
 
+      let insertedId = editingItem?.id;
+
       if (editingItem) {
         const { error } = await supabase.from(activeTab).update(finalPayload).eq('id', editingItem.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from(activeTab).insert([finalPayload]);
+        const { data: insertedData, error } = await supabase.from(activeTab).insert([finalPayload]).select();
         if (error) throw error;
+        if (insertedData && insertedData.length > 0) {
+          insertedId = insertedData[0].id;
+        }
+      }
+
+      if (activeTab === 'categories' && insertedId) {
+        try {
+          const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
+          if (formData.limit_amount && formData.type === 'expense') {
+            budgets[insertedId] = Number(formData.limit_amount);
+          } else {
+            delete budgets[insertedId];
+          }
+          localStorage.setItem('category_budgets', JSON.stringify(budgets));
+        } catch (e) {
+          console.error('Error saving category budget limit:', e);
+        }
       }
 
       setIsModalOpen(false);
@@ -178,7 +210,18 @@ export default function CadastrosPage() {
 
   const openEdit = (item: any) => {
     setEditingItem(item);
-    reset(item);
+    if (activeTab === 'categories') {
+      try {
+        const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
+        const limit = budgets[item.id] || '';
+        reset({ ...item, limit_amount: limit });
+      } catch (e) {
+        console.error('Error loading category budget limit:', e);
+        reset(item);
+      }
+    } else {
+      reset(item);
+    }
     setIsModalOpen(true);
   };
 
@@ -186,6 +229,17 @@ export default function CadastrosPage() {
     try {
       const { error } = await supabase.from(activeTab).delete().eq('id', id);
       if (error) throw error;
+
+      if (activeTab === 'categories') {
+        try {
+          const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
+          delete budgets[id];
+          localStorage.setItem('category_budgets', JSON.stringify(budgets));
+        } catch (e) {
+          console.error('Error removing category budget limit:', e);
+        }
+      }
+
       setDeleteConfirmId(null);
       fetchData();
       fetchHelpers();
@@ -268,6 +322,12 @@ export default function CadastrosPage() {
                 <option value="investment">Investimento</option>
               </select>
             </div>
+            {categoryType === 'expense' && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Limite de Orçamento Mensal (R$ - Opcional)</label>
+                <input type="number" step="0.01" {...register('limit_amount')} className="input-field" placeholder="Ex: 500.00" />
+              </div>
+            )}
           </div>
         );
       case 'recurring_bills':
@@ -410,7 +470,12 @@ export default function CadastrosPage() {
                 <thead>
                   <tr className="border-b border-border text-sm text-text-secondary">
                     <th className="pb-4 font-medium">Nome / Descrição</th>
-                    {activeTab === 'categories' && <th className="pb-4 font-medium">Tipo</th>}
+                    {activeTab === 'categories' && (
+                      <>
+                        <th className="pb-4 font-medium">Tipo</th>
+                        <th className="pb-4 font-medium">Limite de Orçamento</th>
+                      </>
+                    )}
                     {(activeTab === 'recurring_bills' || activeTab === 'recurring_incomes') && (
                       <>
                         <th className="pb-4 font-medium">Valor</th>
@@ -433,16 +498,27 @@ export default function CadastrosPage() {
                         )}
                       </td>
                       {activeTab === 'categories' && (
-                        <td className="py-4 text-sm">
-                          <span className={cn(
-                            "px-2 py-1 rounded-md text-[10px] uppercase font-bold",
-                            item.type === 'income' ? "bg-accent/10 text-accent" : 
-                            item.type === 'expense' ? "bg-red-500/10 text-red-500" : 
-                            "bg-blue-500/10 text-blue-500"
-                          )}>
-                            {item.type === 'income' ? 'Entrada' : item.type === 'expense' ? 'Saída' : 'Investimento'}
-                          </span>
-                        </td>
+                        <>
+                          <td className="py-4 text-sm">
+                            <span className={cn(
+                              "px-2 py-1 rounded-md text-[10px] uppercase font-bold",
+                              item.type === 'income' ? "bg-accent/10 text-accent" : 
+                              item.type === 'expense' ? "bg-red-500/10 text-red-500" : 
+                              "bg-blue-500/10 text-blue-500"
+                            )}>
+                              {item.type === 'income' ? 'Entrada' : item.type === 'expense' ? 'Saída' : 'Investimento'}
+                            </span>
+                          </td>
+                          <td className="py-4 text-sm font-medium text-text-secondary">
+                            {categoryBudgets[item.id] ? (
+                              <span className="text-accent font-semibold">
+                                R$ {Number(categoryBudgets[item.id]).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-neutral-500">Sem limite</span>
+                            )}
+                          </td>
+                        </>
                       )}
                       {(activeTab === 'recurring_bills' || activeTab === 'recurring_incomes') && (
                         <>
