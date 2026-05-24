@@ -171,18 +171,18 @@ export default function DashboardPage() {
 
       const isCardBillPaid = (cardId: string) => {
         return allPaidExpenses.some((e: any) => {
-          const d = new Date(e.date);
+          const expenseDateStr = e.date.split('T')[0];
           return e.credit_card_id === cardId && 
                  e.payment_method !== 'Cartão de Crédito' && 
                  e.payment_method !== 'Cartão de crédito' &&
-                 d >= start && d <= end;
+                 expenseDateStr >= startStr && expenseDateStr <= endStr;
         });
       };
 
       // Filter paid expenses for the calendar month stats (excluding statement payments)
       const paidExpenses = allPaidExpenses.filter((e: any) => {
-        const d = new Date(e.date);
-        return d >= start && d <= end && !isStatementPayment(e);
+        const expenseDateStr = e.date.split('T')[0];
+        return expenseDateStr >= startStr && expenseDateStr <= endStr && !isStatementPayment(e);
       });
 
       console.log('fetchDashboardData: Data fetched, processing...', { 
@@ -225,29 +225,27 @@ export default function DashboardPage() {
         // Adjust start to previous month
         cycleStart.setMonth(cycleStart.getMonth() - 1);
         
-        console.log(`DEBUG: Card: ${card.name}, Due: ${dueDay}, Closing: ${closingDay}, Cycle: ${cycleStart.toISOString()} to ${cycleEnd.toISOString()}`);
+        const cycleStartStr = format(cycleStart, 'yyyy-MM-dd');
+        const cycleEndStr = format(cycleEnd, 'yyyy-MM-dd');
+
+        console.log(`DEBUG: Card: ${card.name}, Due: ${dueDay}, Closing: ${closingDay}, Cycle: ${cycleStartStr} to ${cycleEndStr}`);
 
         // 1. Find expenses (paid and pending) that belong to this bill cycle
         const cyclePaidExpenses = allPaidCardExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return e.credit_card_id === card.id && d >= cycleStart && d <= cycleEnd;
+          const expenseDateStr = e.date.split('T')[0];
+          return e.credit_card_id === card.id && expenseDateStr >= cycleStartStr && expenseDateStr <= cycleEndStr;
         });
 
         // For pending, we include only expenses for this card that fall within the cycle
         const cyclePendingExpenses = pendingCardExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return e.credit_card_id === card.id && d >= cycleStart && d <= cycleEnd;
+          const expenseDateStr = e.date.split('T')[0];
+          return e.credit_card_id === card.id && expenseDateStr >= cycleStartStr && expenseDateStr <= cycleEndStr;
         });
         
         // 2. Find installments due in the cycle of the bill
         const installmentItems = pendingInstallments.filter((inst: any) => {
           const purchase = allCardPurchases.find((p: any) => p.id === inst.purchase_id);
-          
-          // Format dates to YYYY-MM-DD for accurate date-only comparison
           const dueDateStr = inst.due_date; // Assuming YYYY-MM-DD format
-          const cycleStartStr = format(cycleStart, 'yyyy-MM-dd');
-          const cycleEndStr = format(cycleEnd, 'yyyy-MM-dd');
-          
           return purchase && purchase.card_id === card.id && dueDateStr >= cycleStartStr && dueDateStr <= cycleEndStr;
         });
 
@@ -256,12 +254,14 @@ export default function DashboardPage() {
           if (rb.payment_method !== 'Cartão de Crédito' || rb.credit_card_id !== card.id) return false;
           
           // Check if already created as expense in this SPECIFIC cycle
-          const hasPaid = allPaidExpenses.some((exp: any) => 
-            exp.recurring_bill_id === rb.id && new Date(exp.date) >= cycleStart && new Date(exp.date) <= cycleEnd
-          );
-          const hasPending = pendingExpenses.some((exp: any) => 
-            exp.recurring_bill_id === rb.id && new Date(exp.date) >= cycleStart && new Date(exp.date) <= cycleEnd
-          );
+          const hasPaid = allPaidExpenses.some((exp: any) => {
+            const expDateStr = exp.date.split('T')[0];
+            return exp.recurring_bill_id === rb.id && expDateStr >= cycleStartStr && expDateStr <= cycleEndStr;
+          });
+          const hasPending = pendingExpenses.some((exp: any) => {
+            const expDateStr = exp.date.split('T')[0];
+            return exp.recurring_bill_id === rb.id && expDateStr >= cycleStartStr && expDateStr <= cycleEndStr;
+          });
           return !hasPaid && !hasPending;
         });
 
@@ -291,8 +291,8 @@ export default function DashboardPage() {
         if (!isPaid) {
           pendingCardTotal += totalBillAmount;
           paidCardExpensesInCycle += cyclePaidExpenses.filter((e: any) => {
-            const d = new Date(e.date);
-            return d >= start && d <= end;
+            const expenseDateStr = e.date.split('T')[0];
+            return expenseDateStr >= startStr && expenseDateStr <= endStr;
           }).reduce((sum: number, i: any) => sum + Number(i.amount), 0);
         }
         
@@ -342,8 +342,8 @@ export default function DashboardPage() {
 
       // Also add paid card expenses of the current month to total spending and category chart
       const currentMonthPaidCard = allPaidCardExpenses.filter((e: any) => {
-        const d = new Date(e.date);
-        return d >= start && d <= end;
+        const expenseDateStr = e.date.split('T')[0];
+        return expenseDateStr >= startStr && expenseDateStr <= endStr;
       });
       
       // totalCardSpending was already calculated as sum of all bills (which include paid expenses).
@@ -357,7 +357,10 @@ export default function DashboardPage() {
       const pendingNonCardExpenses = pendingExpenses.filter((e: any) => 
         e.payment_method !== 'Cartão de Crédito' && e.payment_method !== 'Cartão de crédito'
       );
-      const currentPendingNonCard = pendingNonCardExpenses.filter((e: any) => new Date(e.date) <= end);
+      const currentPendingNonCard = pendingNonCardExpenses.filter((e: any) => {
+        const expenseDateStr = e.date.split('T')[0];
+        return expenseDateStr <= endStr;
+      });
       setPendingExpenses(currentPendingNonCard);
 
       // Check for unpaid recurring items
@@ -513,16 +516,17 @@ export default function DashboardPage() {
         const dueDay = card.due_day || 10;
         const closingDay = card.closing_day || (dueDay > 7 ? dueDay - 7 : 1);
         const cardCycleEnd = new Date(currentDate.getFullYear(), currentDate.getMonth(), closingDay, 23, 59, 59);
+        const cardCycleEndStr = format(cardCycleEnd, 'yyyy-MM-dd');
 
         // Filter paid and pending expenses for this card that fall after the current billing cycle
         const futurePaid = allPaidExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return e.credit_card_id === card.id && d > cardCycleEnd;
+          const expenseDateStr = e.date.split('T')[0];
+          return e.credit_card_id === card.id && expenseDateStr > cardCycleEndStr;
         });
 
         const futurePending = pendingExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return e.credit_card_id === card.id && d > cardCycleEnd;
+          const expenseDateStr = e.date.split('T')[0];
+          return e.credit_card_id === card.id && expenseDateStr > cardCycleEndStr;
         });
 
         const futureTotal = [...futurePaid, ...futurePending].reduce((sum: number, e: any) => sum + Number(e.amount), 0);
@@ -564,12 +568,12 @@ export default function DashboardPage() {
 
       const targetMonthExpenses = [
         ...allPaidExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return d >= start && d <= end && !isStatementPayment(e);
+          const expenseDateStr = e.date.split('T')[0];
+          return expenseDateStr >= startStr && expenseDateStr <= endStr && !isStatementPayment(e);
         }),
         ...pendingExpenses.filter((e: any) => {
-          const d = new Date(e.date);
-          return d >= start && d <= end;
+          const expenseDateStr = e.date.split('T')[0];
+          return expenseDateStr >= startStr && expenseDateStr <= endStr;
         })
       ];
 
