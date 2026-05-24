@@ -84,7 +84,7 @@ export default function InvestimentosPage() {
         query = query.lte('date', filters.endDate);
       }
       if (filters.search) {
-        query = query.ilike('description', `%${filters.search}%`);
+        query = query.ilike('asset_name', `%${filters.search}%`);
       }
 
       const { data: result, error: fetchError } = await query.order('date', { ascending: false });
@@ -111,7 +111,7 @@ export default function InvestimentosPage() {
       const dateToSave = formData.date.includes('T') ? formData.date : `${formData.date}T12:00:00`;
       
       const payload = {
-        description: formData.description,
+        asset_name: formData.asset_name,
         amount: Number(formData.amount),
         date: dateToSave,
         category_id: formData.category_id,
@@ -344,7 +344,7 @@ export default function InvestimentosPage() {
                         <td className="py-4 text-sm">{formatDate(item.date)}</td>
                         <td className="py-4 font-medium">
                           <div>
-                            <p>{item.description}</p>
+                            <p>{item.asset_name}</p>
                             <p className="text-[10px] text-text-secondary uppercase">{item.banks?.name}</p>
                           </div>
                         </td>
@@ -485,7 +485,7 @@ export default function InvestimentosPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Ativo / Descrição</label>
-              <input {...register('description')} className="input-field" placeholder="Ex: PETR4, Tesouro Selic 2029..." required />
+              <input {...register('asset_name')} className="input-field" placeholder="Ex: PETR4, Tesouro Selic 2029..." required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
