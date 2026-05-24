@@ -58,6 +58,7 @@ export type Database = {
           bank_id: string | null;
           recurring_income_id: string | null;
           notes: string | null;
+          status: 'pending' | 'paid';
           user_id: string;
           created_at: string;
         };

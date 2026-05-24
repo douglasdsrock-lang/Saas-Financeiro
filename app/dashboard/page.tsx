@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [cardBreakdown, setCardBreakdown] = useState<any[]>([]);
   const [cardDebtData, setCardDebtData] = useState<any[]>([]);
   const [pendingExpenses, setPendingExpenses] = useState<any[]>([]);
+  const [pendingIncomes, setPendingIncomes] = useState<any[]>([]);
   const [recurringBillsReminders, setRecurringBillsReminders] = useState<any[]>([]);
   const [recurringIncomesReminders, setRecurringIncomesReminders] = useState<any[]>([]);
   const [cardBillReminders, setCardBillReminders] = useState<any[]>([]);
@@ -376,7 +377,12 @@ export default function DashboardPage() {
       });
       setRecurringIncomesReminders(unpaidRecurringIncomes);
 
-      const totalIncome = incomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      // Separate incomes by status
+      const paidIncomes = incomes.filter((i: any) => i.status !== 'pending');
+      const currentPendingIncomes = incomes.filter((i: any) => i.status === 'pending');
+      setPendingIncomes(currentPendingIncomes);
+
+      const totalIncome = paidIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
       // Total Expense: Only what is actually PAID (excluding statement payments since they are filtered in paidExpenses)
       const totalPaidExpense = paidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
@@ -392,8 +398,9 @@ export default function DashboardPage() {
       const unpaidBillsTotal = unpaidRecurringBills.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
       const pendingNonCardTotal = currentPendingNonCard.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
       const unpaidIncomesTotal = unpaidRecurringIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      const pendingIncomesTotal = currentPendingIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
 
-      const predictedIncome = totalIncome + unpaidIncomesTotal;
+      const predictedIncome = totalIncome + unpaidIncomesTotal + pendingIncomesTotal;
       
       const predictedExpense = totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal;
       const predictedBalance = predictedIncome - predictedExpense - totalInvested;
@@ -425,7 +432,7 @@ export default function DashboardPage() {
         saidas: 0
       }));
 
-      incomes.forEach((i: any) => {
+      paidIncomes.forEach((i: any) => {
         const day = parseInt(i.date.split('T')[0].split('-')[2], 10);
         if (dailyData[day - 1]) dailyData[day - 1].entradas += Number(i.amount);
       });
@@ -674,6 +681,23 @@ export default function DashboardPage() {
       fetchDashboardData(true);
     } catch (error: any) {
       alert(`Erro ao confirmar pagamento: ${error.message}`);
+    }
+  };
+
+  const handleConfirmIncomeReceipt = async (incomeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('incomes')
+        .update({ 
+          status: 'paid', 
+          date: new Date().toISOString() // Update date to receipt date for correct balance impact
+        })
+        .eq('id', incomeId);
+
+      if (error) throw error;
+      fetchDashboardData(true);
+    } catch (error: any) {
+      alert(`Erro ao confirmar recebimento: ${error.message}`);
     }
   };
 
@@ -1280,38 +1304,66 @@ export default function DashboardPage() {
                 Receitas a Receber
               </h3>
               <span className="text-xs font-bold bg-accent/10 text-accent px-2.5 py-1 rounded-full">
-                {recurringIncomesReminders.length} Pendentes
+                {recurringIncomesReminders.length + pendingIncomes.length} Pendentes
               </span>
             </div>
             <div className="space-y-4">
-              {recurringIncomesReminders.length === 0 ? (
+              {recurringIncomesReminders.length === 0 && pendingIncomes.length === 0 ? (
                 <div className="py-8 text-center text-text-secondary text-sm italic">
-                  Todas as receitas fixas deste mês foram recebidas!
+                  Todas as receitas deste mês foram recebidas!
                 </div>
               ) : (
-                recurringIncomesReminders.map((income) => (
-                  <div key={income.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-accent/30 transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-                        <ArrowUpRight className="w-5 h-5" />
+                <>
+                  {/* Pending Incomes (One-time) */}
+                  {pendingIncomes.map((income) => (
+                    <div key={income.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-yellow-500/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center text-yellow-500">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">{income.description}</p>
+                          <p className="text-xs text-text-secondary">Recebimento: {formatDate(income.date)}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold">{income.name}</p>
-                        <p className="text-xs text-text-secondary">Recebe dia {income.due_day}</p>
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-yellow-500">R$ {Number(income.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <button 
+                          onClick={() => handleConfirmIncomeReceipt(income.id)}
+                          className="p-2 bg-neutral-800 hover:bg-green-500 hover:text-white rounded-xl transition-all"
+                          title="Confirmar recebimento"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="font-black text-accent">R$ {income.amount.toLocaleString('pt-BR')}</p>
-                      <button 
-                        onClick={() => handleReceiveIncome(income)}
-                        className="p-2 bg-neutral-800 hover:bg-accent hover:text-white rounded-xl transition-all"
-                        title="Marcar como recebido"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                      </button>
+                  ))}
+
+                  {/* Recurring Incomes */}
+                  {recurringIncomesReminders.map((income) => (
+                    <div key={income.id} className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group hover:border-accent/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                          <ArrowUpRight className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="font-bold">{income.name}</p>
+                          <p className="text-xs text-text-secondary">Recebe dia {income.due_day}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className="font-black text-accent">R$ {income.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <button 
+                          onClick={() => handleReceiveIncome(income)}
+                          className="p-2 bg-neutral-800 hover:bg-accent hover:text-white rounded-xl transition-all"
+                          title="Marcar como recebido"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </Card>

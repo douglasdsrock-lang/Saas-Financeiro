@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { handleSupabaseError, formatDate } from '@/lib/utils';
+import { handleSupabaseError, formatDate, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
-import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw, Check } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import SidebarLayout from '@/components/sidebar-layout';
@@ -122,6 +122,7 @@ export default function EntradasPage() {
         person_id: formData.person_id,
         bank_id: formData.bank_id || null,
         notes: formData.notes || null,
+        status: formData.status || 'paid',
         user_id: user.id
       };
 
@@ -154,7 +155,37 @@ export default function EntradasPage() {
         setValue(key, item[key]);
       }
     });
+    setValue('status', item.status || 'paid');
     setIsModalOpen(true);
+  };
+
+  const handleConfirmReceipt = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('incomes')
+        .update({ status: 'paid', date: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+      await fetchData();
+    } catch (error: any) {
+      alert(`Erro ao confirmar recebimento: ${error.message}`);
+    }
+  };
+
+  const handleBulkMarkReceived = async () => {
+    try {
+      const { error } = await supabase
+        .from('incomes')
+        .update({ status: 'paid' })
+        .in('id', selectedIncomeIds);
+      if (error) throw error;
+      setSelectedIncomeIds([]);
+      await fetchData();
+      alert('Receitas marcadas como recebidas com sucesso!');
+    } catch (err: any) {
+      console.error('Error bulk updating incomes:', err);
+      alert(`Erro ao atualizar receitas: ${err.message}`);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -304,6 +335,7 @@ export default function EntradasPage() {
                     <th className="pb-4 font-medium">Categoria</th>
                     <th className="pb-4 font-medium">Pessoa</th>
                     <th className="pb-4 font-medium">Banco</th>
+                    <th className="pb-4 font-medium">Status</th>
                     <th className="pb-4 font-medium">Valor</th>
                     <th className="pb-4 font-medium text-right">Ações</th>
                   </tr>
@@ -336,9 +368,26 @@ export default function EntradasPage() {
                       </td>
                       <td className="py-4 text-sm text-text-secondary">{item.people?.name}</td>
                       <td className="py-4 text-sm text-text-secondary">{item.banks?.name || '-'}</td>
+                      <td className="py-4 text-sm">
+                        <span className={cn(
+                          "px-2 py-1 rounded-md text-[10px] uppercase font-bold",
+                          item.status === 'pending' ? "bg-amber-500/10 text-amber-500 border border-amber-500/10" : "bg-green-500/10 text-green-500 border border-green-500/10"
+                        )}>
+                          {item.status === 'pending' ? 'Pendente' : 'Recebido'}
+                        </span>
+                      </td>
                       <td className="py-4 font-bold text-accent">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
                       <td className="py-4 text-right">
                         <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                          {item.status === 'pending' && (
+                            <button 
+                              onClick={() => handleConfirmReceipt(item.id)} 
+                              className="p-2 hover:bg-green-500/10 rounded-lg text-green-500"
+                              title="Confirmar Recebimento"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
                           <button onClick={() => openEdit(item)} className="p-2 hover:bg-neutral-700 rounded-lg text-text-secondary">
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -406,6 +455,12 @@ export default function EntradasPage() {
             </span>
             <div className="flex gap-2">
               <button 
+                onClick={handleBulkMarkReceived}
+                className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-500 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-green-500/30 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" /> Recebido
+              </button>
+              <button 
                 onClick={() => setIsBulkDeleteConfirmOpen(true)}
                 className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-red-500/30 cursor-pointer"
               >
@@ -431,7 +486,7 @@ export default function EntradasPage() {
               <label className="block text-sm font-medium mb-1">Descrição</label>
               <input {...register('description')} className="input-field" required />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Valor</label>
                 <input type="number" step="0.01" {...register('amount')} className="input-field" required />
@@ -439,6 +494,13 @@ export default function EntradasPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Data</label>
                 <input type="date" {...register('date')} className="input-field" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Status</label>
+                <select {...register('status')} className="input-field" required defaultValue="paid">
+                  <option value="paid">Recebido</option>
+                  <option value="pending">Pendente</option>
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
