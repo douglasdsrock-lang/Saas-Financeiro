@@ -151,9 +151,12 @@ export default function DashboardPage() {
           try {
             const localBudgets = JSON.parse(localBudgetsStr);
             const budgetKeys = Object.keys(localBudgets);
-            if (budgetKeys.length > 0) {
+            // Filter to only include category IDs that actually exist in the DB categories list
+            const validBudgetKeys = budgetKeys.filter(catId => categories.some((c: any) => c.id === catId));
+            
+            if (validBudgetKeys.length > 0) {
               console.log('Auto-migration: migrating budgets to Supabase...', localBudgets);
-              const upsertPayloads = budgetKeys.map(catId => ({
+              const upsertPayloads = validBudgetKeys.map(catId => ({
                 category_id: catId,
                 limit_amount: Number(localBudgets[catId]),
                 user_id: user.id
@@ -162,7 +165,7 @@ export default function DashboardPage() {
                 .from('category_budgets')
                 .upsert(upsertPayloads);
               if (upsertError) {
-                console.error('Auto-migration error:', upsertError);
+                console.error('Auto-migration error:', upsertError.message, upsertError.details, upsertError.code);
               } else {
                 console.log('Auto-migration: Success! Clearing localStorage category_budgets.');
                 localStorage.removeItem('category_budgets');
@@ -175,6 +178,7 @@ export default function DashboardPage() {
                 }
               }
             } else {
+              console.log('Auto-migration: No valid category budgets found in localStorage, clearing key.');
               localStorage.removeItem('category_budgets');
             }
           } catch (e) {
