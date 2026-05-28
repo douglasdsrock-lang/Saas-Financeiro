@@ -563,8 +563,8 @@ export default function DashboardPage() {
           // Current month: actual + pending
           projection.push({
             name: `${monthName} (Atual)`,
-            entradas: totalIncome + unpaidIncomesTotal,
-            saidas: totalPaidExpense + unpaidBillsTotal + pendingNonCardTotal + pendingCardTotal
+            entradas: predictedIncome,
+            saidas: predictedExpense
           });
         } else {
           // Future months: recurring only
