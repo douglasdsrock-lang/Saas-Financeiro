@@ -163,7 +163,7 @@ export default function DashboardPage() {
               }));
               const { error: upsertError } = await supabase
                 .from('category_budgets')
-                .upsert(upsertPayloads);
+                .upsert(upsertPayloads, { onConflict: 'user_id,category_id' });
               if (upsertError) {
                 console.error('Auto-migration error:', upsertError.message, upsertError.details, upsertError.code);
               } else {

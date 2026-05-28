@@ -186,7 +186,7 @@ export default function CadastrosPage() {
                 category_id: insertedId,
                 limit_amount: Number(formData.limit_amount),
                 user_id: user.id
-              });
+              }, { onConflict: 'user_id,category_id' });
             if (budgetError) throw budgetError;
           } else {
             const { error: deleteError } = await supabase
