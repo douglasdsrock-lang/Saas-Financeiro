@@ -98,6 +98,12 @@ export default function DashboardPage() {
       const end = endOfMonth(currentDate);
       const startStr = format(start, 'yyyy-MM-dd');
       const endStr = format(end, 'yyyy-MM-dd');
+
+      const prevMonth = subMonths(currentDate, 1);
+      const prevStart = startOfMonth(prevMonth);
+      const prevEnd = endOfMonth(prevMonth);
+      const prevStartStr = format(prevStart, 'yyyy-MM-dd');
+      const prevEndStr = format(prevEnd, 'yyyy-MM-dd');
       
       // Fetch expenses from the previous month to cover credit card cycles
       const extendedStartStr = format(subDays(start, 45), 'yyyy-MM-dd');
@@ -129,7 +135,9 @@ export default function DashboardPage() {
         pendingInstallments,
         allCardPurchases,
         categories,
-        budgetsData
+        budgetsData,
+        prevIncomes,
+        prevExpenses
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr)),
@@ -142,7 +150,9 @@ export default function DashboardPage() {
         fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id)),
-        fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id))
+        fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id)),
+        fetchTable('prev_incomes', supabase.from('incomes').select('amount, status').eq('user_id', user.id).gte('date', prevStartStr).lte('date', prevEndStr)),
+        fetchTable('prev_expenses', supabase.from('expenses').select('amount, payment_method, credit_card_id').eq('user_id', user.id).eq('status', 'paid').gte('date', prevStartStr).lte('date', prevEndStr))
       ]);
 
       // Auto-migration from localStorage to Supabase
@@ -532,25 +542,35 @@ export default function DashboardPage() {
         .sort((a, b) => b.value - a.value)
       );
 
-      // Process Projection Data (Current + 3 Months)
+      // Process Projection Data (Previous + Current + 2 Months)
       const projection: any[] = [];
-      for (let i = 0; i <= 3; i++) {
+      const prevTotalIncome = prevIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      const prevPaidExpensesList = prevExpenses.filter((e: any) => !isStatementPayment(e));
+      const prevTotalExpense = prevPaidExpensesList.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+
+      for (let i = -1; i <= 2; i++) {
         const targetDate = addMonths(currentDate, i);
         const monthName = format(targetDate, 'MMM', { locale: ptBR });
         
-        // For future months, we use recurring items as the base
-        const monthRecurringIncomes = recurringIncomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0);
-        const monthRecurringBills = recurringBills.reduce((sum: number, bill: any) => sum + Number(bill.amount), 0);
-        
-        if (i === 0) {
+        if (i === -1) {
+          // Previous Month: Actuals
+          projection.push({
+            name: `${monthName} (Ant.)`,
+            entradas: prevTotalIncome,
+            saidas: prevTotalExpense
+          });
+        } else if (i === 0) {
           // Current month: actual + pending
           projection.push({
-            name: monthName,
+            name: `${monthName} (Atual)`,
             entradas: totalIncome + unpaidIncomesTotal,
             saidas: totalPaidExpense + unpaidBillsTotal + pendingNonCardTotal + pendingCardTotal
           });
         } else {
           // Future months: recurring only
+          const monthRecurringIncomes = recurringIncomes.reduce((sum: number, inc: any) => sum + Number(inc.amount), 0);
+          const monthRecurringBills = recurringBills.reduce((sum: number, bill: any) => sum + Number(bill.amount), 0);
+          
           projection.push({
             name: monthName,
             entradas: monthRecurringIncomes,
@@ -958,8 +978,22 @@ export default function DashboardPage() {
                     formatter={(value: number) => `R$ ${value.toLocaleString('pt-BR')}`}
                     cursor={{ fill: 'rgba(255,255,255,0.03)', opacity: 0.4 }}
                   />
-                  <Bar dataKey="entradas" fill="#22c55e" radius={[6, 6, 0, 0]} barSize={45} />
-                  <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={45} />
+                  <Bar dataKey="entradas" fill="#10b981" radius={[6, 6, 0, 0]} barSize={45}>
+                    {projectionData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-in-${index}`} 
+                        fill={index === 1 ? '#10b981' : '#10b98145'} 
+                      />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="saidas" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={45}>
+                    {projectionData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-out-${index}`} 
+                        fill={index === 1 ? '#ef4444' : '#ef444445'} 
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
