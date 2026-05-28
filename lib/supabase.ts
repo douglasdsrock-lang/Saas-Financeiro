@@ -113,6 +113,7 @@ export type Database = {
           limit_amount: number;
           active: boolean;
           user_id: string;
+          bank: string;
         };
       };
       card_purchases: {

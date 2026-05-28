@@ -153,6 +153,11 @@ export default function CadastrosPage() {
         }
       });
 
+      if (activeTab === 'credit_cards') {
+        const selectedBank = banks.find(b => b.id === formData.bank_id);
+        payload.bank = selectedBank ? selectedBank.name : '';
+      }
+
       // Conversions
       if (payload.amount !== undefined) payload.amount = Number(payload.amount);
       if (payload.due_day !== undefined) payload.due_day = Number(payload.due_day);
