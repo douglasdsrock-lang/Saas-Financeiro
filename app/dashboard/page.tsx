@@ -380,6 +380,7 @@ export default function DashboardPage() {
           currentBillExpenses.push({
             ...inst,
             amount: inst.amount,
+            category_id: purchase?.category_id,
             categories: { name: 'Parcelamento' },
             payment_method: 'Cartão de Crédito'
           });
@@ -614,22 +615,20 @@ export default function DashboardPage() {
         budgets[item.category_id] = Number(item.limit_amount);
       });
 
-      const targetMonthExpenses = [
-        ...allPaidExpenses.filter((e: any) => {
-          const expenseDateStr = e.date.split('T')[0];
-          return expenseDateStr >= startStr && expenseDateStr <= endStr && !isStatementPayment(e);
-        }),
-        ...pendingExpenses.filter((e: any) => {
-          const expenseDateStr = e.date.split('T')[0];
-          return expenseDateStr >= startStr && expenseDateStr <= endStr;
-        })
+      const budgetExpenses = [
+        // 1. Non-card PAID expenses of the calendar month
+        ...paidExpenses.filter((e: any) => e.payment_method !== 'Cartão de Crédito' && e.payment_method !== 'Cartão de crédito'),
+        // 2. Card expenses of the current bill cycle
+        ...currentBillExpenses,
+        // 3. Pending non-card expenses of the calendar month
+        ...currentPendingNonCard
       ];
 
       const activeBudgetsData = categories
         .filter((c: any) => budgets[c.id] !== undefined)
         .map((c: any) => {
           const limit = budgets[c.id];
-          const spent = targetMonthExpenses
+          const spent = budgetExpenses
             .filter((e: any) => e.category_id === c.id)
             .reduce((sum: number, e: any) => sum + Number(e.amount), 0);
           const percent = limit > 0 ? (spent / limit) * 100 : 0;
