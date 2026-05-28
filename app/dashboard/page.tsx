@@ -49,6 +49,7 @@ export default function DashboardPage() {
     totalIncome: 0,
     totalExpense: 0,
     totalInvested: 0,
+    currentMonthInvested: 0,
     balance: 0,
     cardSpending: 0,
     predictedIncome: 0,
@@ -133,7 +134,7 @@ export default function DashboardPage() {
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr)),
         fetchTable('pending_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'pending')),
-        fetchTable('investments', supabase.from('investments').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
+        fetchTable('investments', supabase.from('investments').select('*').eq('user_id', user.id)),
         fetchTable('recurring_bills', supabase.from('recurring_bills').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('recurring_incomes', supabase.from('recurring_incomes').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
@@ -433,8 +434,14 @@ export default function DashboardPage() {
       // Total Expense: Only what is actually PAID (excluding statement payments since they are filtered in paidExpenses)
       const totalPaidExpense = paidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
-      const totalInvested = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const balance = totalIncome - totalPaidExpense - totalInvested;
+      const totalInvestedAllTime = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      const currentMonthInvested = investments
+        .filter((i: any) => {
+          const dateStr = i.date.split('T')[0];
+          return dateStr >= startStr && dateStr <= endStr;
+        })
+        .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      const balance = totalIncome - totalPaidExpense - currentMonthInvested;
 
       // Predicted values:
       // totalPaidExpense includes paid expenses (both card and non-card).
@@ -449,7 +456,7 @@ export default function DashboardPage() {
       const predictedIncome = totalIncome + unpaidIncomesTotal + pendingIncomesTotal;
       
       const predictedExpense = totalPaidExpense + (pendingCardTotal - paidCardExpensesInCycle) + unpaidBillsTotal + pendingNonCardTotal;
-      const predictedBalance = predictedIncome - predictedExpense - totalInvested;
+      const predictedBalance = predictedIncome - predictedExpense - currentMonthInvested;
 
       console.log('fetchDashboardData: Totals calculated', {
         totalPaidExpense,
@@ -462,7 +469,8 @@ export default function DashboardPage() {
       setStats({
         totalIncome,
         totalExpense: totalPaidExpense,
-        totalInvested,
+        totalInvested: totalInvestedAllTime,
+        currentMonthInvested,
         balance,
         cardSpending: totalCardSpending,
         predictedIncome,
@@ -890,6 +898,7 @@ export default function DashboardPage() {
             value={`R$ ${stats.totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={Wallet}
             color="blue"
+            description={`Mês atual: R$ ${stats.currentMonthInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           />
           <StatCard 
             title="Saldo Atual" 
