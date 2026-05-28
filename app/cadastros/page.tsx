@@ -47,17 +47,6 @@ export default function CadastrosPage() {
   const categoryType = watch('type');
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-        setCategoryBudgets(budgets);
-      } catch (e) {
-        console.error('Error parsing category_budgets:', e);
-      }
-    }
-  }, [activeTab, data]);
-
   const tabs = [
     { id: 'people', name: 'Pessoas', icon: Users },
     { id: 'banks', name: 'Bancos', icon: Building2 },
@@ -82,16 +71,23 @@ export default function CadastrosPage() {
         return data || [];
       };
 
-      const [p, c, b, cc] = await Promise.all([
+      const [p, c, b, cc, budgetsData] = await Promise.all([
         fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('user_id', user.id)),
         fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
-        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id))
+        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
+        fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id))
       ]);
       setPeople(p);
       setCategories(c);
       setBanks(b);
       setCreditCards(cc);
+
+      const budgetsMap: Record<string, number> = {};
+      budgetsData.forEach((item: any) => {
+        budgetsMap[item.category_id] = Number(item.limit_amount);
+      });
+      setCategoryBudgets(budgetsMap);
     } catch (e) {
       console.error('Error fetching helpers:', e);
     }
@@ -183,13 +179,23 @@ export default function CadastrosPage() {
 
       if (activeTab === 'categories' && insertedId) {
         try {
-          const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-          if (formData.limit_amount && formData.type === 'expense') {
-            budgets[insertedId] = Number(formData.limit_amount);
+          if (formData.limit_amount && formData.type === 'expense' && Number(formData.limit_amount) > 0) {
+            const { error: budgetError } = await supabase
+              .from('category_budgets')
+              .upsert({
+                category_id: insertedId,
+                limit_amount: Number(formData.limit_amount),
+                user_id: user.id
+              });
+            if (budgetError) throw budgetError;
           } else {
-            delete budgets[insertedId];
+            const { error: deleteError } = await supabase
+              .from('category_budgets')
+              .delete()
+              .eq('category_id', insertedId)
+              .eq('user_id', user.id);
+            if (deleteError) throw deleteError;
           }
-          localStorage.setItem('category_budgets', JSON.stringify(budgets));
         } catch (e) {
           console.error('Error saving category budget limit:', e);
         }
@@ -211,14 +217,8 @@ export default function CadastrosPage() {
   const openEdit = (item: any) => {
     setEditingItem(item);
     if (activeTab === 'categories') {
-      try {
-        const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-        const limit = budgets[item.id] || '';
-        reset({ ...item, limit_amount: limit });
-      } catch (e) {
-        console.error('Error loading category budget limit:', e);
-        reset(item);
-      }
+      const limit = categoryBudgets[item.id] || '';
+      reset({ ...item, limit_amount: limit });
     } else {
       reset(item);
     }
@@ -229,16 +229,6 @@ export default function CadastrosPage() {
     try {
       const { error } = await supabase.from(activeTab).delete().eq('id', id);
       if (error) throw error;
-
-      if (activeTab === 'categories') {
-        try {
-          const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-          delete budgets[id];
-          localStorage.setItem('category_budgets', JSON.stringify(budgets));
-        } catch (e) {
-          console.error('Error removing category budget limit:', e);
-        }
-      }
 
       setDeleteConfirmId(null);
       fetchData();

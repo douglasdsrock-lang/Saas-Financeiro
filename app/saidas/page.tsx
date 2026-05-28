@@ -125,15 +125,22 @@ export default function SaidasPage() {
         return data || [];
       };
 
-      const [p, c, cc] = await Promise.all([
+      const [p, c, cc, budgetsData] = await Promise.all([
         fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id)),
-        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id))
+        fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
+        fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id))
       ]);
 
       setPeople(p);
       setCategories(c);
       setCreditCards(cc);
+
+      const budgetsMap: Record<string, number> = {};
+      budgetsData.forEach((item: any) => {
+        budgetsMap[item.category_id] = Number(item.limit_amount);
+      });
+      setCategoryBudgets(budgetsMap);
     } catch (error) {
       console.error('Error fetching helpers:', error);
     }
@@ -265,16 +272,7 @@ export default function SaidasPage() {
     fetchMonthlyExpenses();
   }, [data, fetchMonthlyExpenses]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-        setCategoryBudgets(budgets);
-      } catch (e) {
-        console.error('Error loading category budgets:', e);
-      }
-    }
-  }, [data]);
+
 
   const parseOFX = (text: string) => {
     const transactions: any[] = [];

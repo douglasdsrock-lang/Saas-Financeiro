@@ -167,6 +167,15 @@ export type Database = {
           user_id: string;
         };
       };
+      category_budgets: {
+        Row: {
+          id: string;
+          category_id: string;
+          limit_amount: number;
+          user_id: string;
+          created_at: string;
+        };
+      };
     };
   };
 };

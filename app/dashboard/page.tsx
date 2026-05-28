@@ -116,7 +116,7 @@ export default function DashboardPage() {
         return data || [];
       };
 
-      const [
+      let [
         incomes,
         allPaidExpenses,
         pendingExpenses,
@@ -127,7 +127,8 @@ export default function DashboardPage() {
         banks,
         pendingInstallments,
         allCardPurchases,
-        categories
+        categories,
+        budgetsData
       ] = await Promise.all([
         fetchTable('incomes', supabase.from('incomes').select('*').eq('user_id', user.id).gte('date', startStr).lte('date', endStr)),
         fetchTable('paid_expenses', supabase.from('expenses').select('*, categories(name)').eq('user_id', user.id).eq('status', 'paid').gte('date', extendedStartStr)),
@@ -139,8 +140,48 @@ export default function DashboardPage() {
         fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
         fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id)),
-        fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id))
+        fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id)),
+        fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id))
       ]);
+
+      // Auto-migration from localStorage to Supabase
+      if (typeof window !== 'undefined') {
+        const localBudgetsStr = localStorage.getItem('category_budgets');
+        if (localBudgetsStr) {
+          try {
+            const localBudgets = JSON.parse(localBudgetsStr);
+            const budgetKeys = Object.keys(localBudgets);
+            if (budgetKeys.length > 0) {
+              console.log('Auto-migration: migrating budgets to Supabase...', localBudgets);
+              const upsertPayloads = budgetKeys.map(catId => ({
+                category_id: catId,
+                limit_amount: Number(localBudgets[catId]),
+                user_id: user.id
+              }));
+              const { error: upsertError } = await supabase
+                .from('category_budgets')
+                .upsert(upsertPayloads);
+              if (upsertError) {
+                console.error('Auto-migration error:', upsertError);
+              } else {
+                console.log('Auto-migration: Success! Clearing localStorage category_budgets.');
+                localStorage.removeItem('category_budgets');
+                const { data: updatedBudgets, error: reFetchError } = await supabase
+                  .from('category_budgets')
+                  .select('*')
+                  .eq('user_id', user.id);
+                if (!reFetchError && updatedBudgets) {
+                  budgetsData = updatedBudgets;
+                }
+              }
+            } else {
+              localStorage.removeItem('category_budgets');
+            }
+          } catch (e) {
+            console.error('Auto-migration parse error:', e);
+          }
+        }
+      }
 
       console.log('fetchDashboardData: Promise.all finished', {
         paid: allPaidExpenses.length,
@@ -564,14 +605,10 @@ export default function DashboardPage() {
       setRecurringIncomesReminders(unpaidRecurringIncomes);
 
       // Calculate Category Budgets
-      let budgets: Record<string, number> = {};
-      if (typeof window !== 'undefined') {
-        try {
-          budgets = JSON.parse(localStorage.getItem('category_budgets') || '{}');
-        } catch (e) {
-          console.error('Error loading category budgets on dashboard:', e);
-        }
-      }
+      const budgets: Record<string, number> = {};
+      budgetsData.forEach((item: any) => {
+        budgets[item.category_id] = Number(item.limit_amount);
+      });
 
       const targetMonthExpenses = [
         ...allPaidExpenses.filter((e: any) => {
