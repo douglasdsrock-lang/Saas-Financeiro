@@ -898,7 +898,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-8">
           <StatCard 
             title="Entradas" 
             value={`R$ ${stats.totalIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
@@ -947,7 +947,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-            <div className="h-[320px] w-full">
+            <div className="h-[240px] sm:h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={projectionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#262626" />
@@ -1062,8 +1062,8 @@ export default function DashboardPage() {
                 <TrendingDown className="w-5 h-5" />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-              <div className="h-[280px] relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-center">
+              <div className="h-[200px] sm:h-[280px] relative">
                 {categoryData.length > 0 ? (
                   <>
                     <ResponsiveContainer width="100%" height="100%">
@@ -1152,8 +1152,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center relative z-10">
-              <div className="h-[240px] relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-center relative z-10">
+              <div className="h-[180px] sm:h-[240px] relative">
                 {cardBreakdown.length > 0 ? (
                   <>
                     <ResponsiveContainer width="100%" height="100%">

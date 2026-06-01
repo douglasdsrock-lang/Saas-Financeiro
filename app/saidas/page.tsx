@@ -791,7 +791,7 @@ export default function SaidasPage() {
                 Limpar
               </button>
 
-              <div className="ml-auto text-red-500 font-black px-4 py-2 bg-red-500/10 border border-red-500/10 rounded-2xl font-display text-sm tracking-wide shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]">
+              <div className="w-full md:w-auto text-center md:ml-auto text-red-500 font-black px-4 py-2 bg-red-500/10 border border-red-500/10 rounded-2xl font-display text-sm tracking-wide shadow-[0_0_15px_-3px_rgba(239,68,68,0.1)]">
                 Total: R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
@@ -871,45 +871,117 @@ export default function SaidasPage() {
               ) : data.length === 0 ? (
                 <div className="py-12 text-center text-text-secondary">Nenhum registro encontrado.</div>
               ) : (
-                <div className="overflow-x-auto relative">
-                  {loading && (
-                    <div className="absolute inset-0 bg-background/25 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all duration-300">
-                      <div className="bg-panel/85 backdrop-blur-md border border-white/[0.04] p-3 rounded-2xl shadow-xl flex items-center gap-2">
-                        <RefreshCcw className="w-4 h-4 text-accent animate-spin" />
-                        <span className="text-xs text-text-secondary font-medium">Atualizando...</span>
+                <>
+                  {/* Desktop View */}
+                  <div className="hidden md:block overflow-x-auto relative">
+                    {loading && (
+                      <div className="absolute inset-0 bg-background/25 backdrop-blur-[1px] flex items-center justify-center z-10 transition-all duration-300">
+                        <div className="bg-panel/85 backdrop-blur-md border border-white/[0.04] p-3 rounded-2xl shadow-xl flex items-center gap-2">
+                          <RefreshCcw className="w-4 h-4 text-accent animate-spin" />
+                          <span className="text-xs text-text-secondary font-medium">Atualizando...</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-white/[0.04] text-sm text-text-secondary">
-                        <th className="pb-4 w-10">
-                          <input 
-                            type="checkbox"
-                            checked={data.length > 0 && selectedExpenseIds.length === data.length}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedExpenseIds(data.map(item => item.id));
-                              } else {
-                                setSelectedExpenseIds([]);
-                              }
-                            }}
-                            className="checkbox-custom"
-                          />
-                        </th>
-                        <th className="pb-4 font-medium">Data</th>
-                        <th className="pb-4 font-medium">Descrição</th>
-                        <th className="pb-4 font-medium">Categoria</th>
-                        <th className="pb-4 font-medium">Método</th>
-                        <th className="pb-4 font-medium">Status</th>
-                        <th className="pb-4 font-medium">Valor</th>
-                        <th className="pb-4 font-medium text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.04]">
-                      {data.map((item) => (
-                        <tr key={item.id} className="group hover:bg-white/[0.01] transition-colors">
-                          <td className="py-4">
+                    )}
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-white/[0.04] text-sm text-text-secondary">
+                          <th className="pb-4 w-10">
+                            <input 
+                              type="checkbox"
+                              checked={data.length > 0 && selectedExpenseIds.length === data.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedExpenseIds(data.map(item => item.id));
+                                } else {
+                                  setSelectedExpenseIds([]);
+                                }
+                              }}
+                              className="checkbox-custom"
+                            />
+                          </th>
+                          <th className="pb-4 font-medium">Data</th>
+                          <th className="pb-4 font-medium">Descrição</th>
+                          <th className="pb-4 font-medium">Categoria</th>
+                          <th className="pb-4 font-medium">Método</th>
+                          <th className="pb-4 font-medium">Status</th>
+                          <th className="pb-4 font-medium">Valor</th>
+                          <th className="pb-4 font-medium text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/[0.04]">
+                        {data.map((item) => (
+                          <tr key={item.id} className="group hover:bg-white/[0.01] transition-colors">
+                            <td className="py-4">
+                              <input 
+                                type="checkbox"
+                                checked={selectedExpenseIds.includes(item.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedExpenseIds(prev => [...prev, item.id]);
+                                  } else {
+                                    setSelectedExpenseIds(prev => prev.filter(id => id !== item.id));
+                                  }
+                                }}
+                                className="checkbox-custom"
+                              />
+                            </td>
+                            <td className="py-4 text-sm text-text-secondary whitespace-nowrap">
+                              {formatDate(item.date)}
+                            </td>
+                            <td className="py-4 font-medium text-white">
+                              <div className="flex items-center gap-2">
+                                {item.description}
+                                {item.is_fixed && <span className="text-[8px] bg-white/[0.04] text-text-secondary border border-white/[0.04] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Fixo</span>}
+                              </div>
+                            </td>
+                            <td className="py-4 text-sm">
+                              <span className="px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/10 text-red-400 text-[10px] uppercase font-bold tracking-wider">
+                                {item.categories?.name}
+                              </span>
+                            </td>
+                            <td className="py-4 text-sm text-text-secondary whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                {item.payment_method === 'Cartão de Crédito' && <CreditCard className="w-3.5 h-3.5" />}
+                                {item.payment_method}
+                                {item.credit_cards?.name && <span className="text-[10px] text-accent">({item.credit_cards.name})</span>}
+                              </div>
+                            </td>
+                            <td className="py-4 text-sm">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${item.status === 'pending' ? 'bg-yellow-500/10 border border-yellow-500/10 text-yellow-500' : 'bg-accent/10 border border-accent/10 text-accent'}`}>
+                                {item.status === 'pending' ? 'Pendente' : 'Pago'}
+                              </span>
+                            </td>
+                            <td className="py-4 font-bold text-red-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td className="py-4 text-right">
+                              <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                                <button onClick={() => openEdit(item)} className="p-2 hover:bg-white/[0.05] rounded-xl text-text-secondary hover:text-white transition-colors cursor-pointer">
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 hover:bg-red-500/10 rounded-xl text-red-400 hover:text-red-500 transition-colors cursor-pointer">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Card List View */}
+                  <div className="md:hidden space-y-4 relative">
+                    {loading && (
+                      <div className="absolute inset-x-0 -top-2 flex items-center justify-center z-10 transition-all duration-300">
+                        <div className="bg-panel/90 backdrop-blur-md border border-white/[0.04] p-2.5 px-4 rounded-full shadow-xl flex items-center gap-2">
+                          <RefreshCcw className="w-3.5 h-3.5 text-accent animate-spin" />
+                          <span className="text-[11px] text-text-secondary font-medium">Atualizando...</span>
+                        </div>
+                      </div>
+                    )}
+                    {data.map((item) => (
+                      <div key={item.id} className="p-4 bg-[#12121a]/40 border border-white/[0.04] rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-all duration-300 hover:border-red-500/10">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
                             <input 
                               type="checkbox"
                               checked={selectedExpenseIds.includes(item.id)}
@@ -920,51 +992,71 @@ export default function SaidasPage() {
                                   setSelectedExpenseIds(prev => prev.filter(id => id !== item.id));
                                 }
                               }}
-                              className="checkbox-custom"
+                              className="checkbox-custom shrink-0"
                             />
-                          </td>
-                          <td className="py-4 text-sm text-text-secondary whitespace-nowrap">
-                            {formatDate(item.date)}
-                          </td>
-                          <td className="py-4 font-medium text-white">
-                            <div className="flex items-center gap-2">
-                              {item.description}
-                              {item.is_fixed && <span className="text-[8px] bg-white/[0.04] text-text-secondary border border-white/[0.04] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Fixo</span>}
+                            <div className="w-9 h-9 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 shrink-0">
+                              <TrendingDown className="w-4.5 h-4.5" />
                             </div>
-                          </td>
-                          <td className="py-4 text-sm">
-                            <span className="px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/10 text-red-400 text-[10px] uppercase font-bold tracking-wider">
-                              {item.categories?.name}
-                            </span>
-                          </td>
-                          <td className="py-4 text-sm text-text-secondary whitespace-nowrap">
-                            <div className="flex items-center gap-1.5">
-                              {item.payment_method === 'Cartão de Crédito' && <CreditCard className="w-3.5 h-3.5" />}
-                              {item.payment_method}
-                              {item.credit_cards?.name && <span className="text-[10px] text-accent">({item.credit_cards.name})</span>}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-bold text-white text-sm truncate">{item.description}</p>
+                                {item.is_fixed && (
+                                  <span className="text-[7px] bg-white/[0.04] text-text-secondary border border-white/[0.04] px-1 py-0.5 rounded font-black uppercase tracking-wider">Fixo</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
                             </div>
-                          </td>
-                          <td className="py-4 text-sm">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${item.status === 'pending' ? 'bg-yellow-500/10 border border-yellow-500/10 text-yellow-500' : 'bg-accent/10 border border-accent/10 text-accent'}`}>
+                          </div>
+                          <div className="text-right flex flex-col items-end">
+                            <p className="font-black text-red-500 text-base">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <span className={`px-2 py-0.5 mt-1 rounded text-[8px] font-bold uppercase tracking-wider ${item.status === 'pending' ? 'bg-yellow-500/10 border border-yellow-500/10 text-yellow-500' : 'bg-accent/10 border border-accent/10 text-accent'}`}>
                               {item.status === 'pending' ? 'Pendente' : 'Pago'}
                             </span>
-                          </td>
-                          <td className="py-4 font-bold text-red-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                          <td className="py-4 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                              <button onClick={() => openEdit(item)} className="p-2 hover:bg-white/[0.05] rounded-xl text-text-secondary hover:text-white transition-colors cursor-pointer">
-                                <Edit2 className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between pt-2.5 border-t border-white/[0.04] gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/10 text-red-400 text-[9px] uppercase font-bold tracking-wider">
+                              {item.categories?.name}
+                            </span>
+                            <span className="text-[9px] text-text-secondary bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                              {item.payment_method === 'Cartão de Crédito' && <CreditCard className="w-2.5 h-2.5 text-accent" />}
+                              <span>{item.payment_method}</span>
+                              {item.credit_cards?.name && <span className="text-accent font-semibold">({item.credit_cards.name})</span>}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 ml-auto">
+                            {item.status === 'pending' && (
+                              <button 
+                                onClick={() => handleConfirmExpensePayment(item.id)} 
+                                className="p-2 hover:bg-green-500/10 rounded-xl text-green-500"
+                                title="Confirmar Pagamento"
+                              >
+                                <Check className="w-4 h-4" />
                               </button>
-                              <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 hover:bg-red-500/10 rounded-xl text-red-400 hover:text-red-500 transition-colors cursor-pointer">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            )}
+                            <button 
+                              onClick={() => openEdit(item)} 
+                              className="p-2 hover:bg-neutral-800 rounded-xl text-text-secondary hover:text-white"
+                              title="Editar"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => setDeleteConfirmId(item.id)} 
+                              className="p-2 hover:bg-red-500/10 rounded-xl text-red-500"
+                              title="Excluir"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </Card>
           </div>

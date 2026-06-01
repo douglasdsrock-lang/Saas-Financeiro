@@ -8,7 +8,7 @@ interface CardProps {
 
 export function Card({ children, className }: CardProps) {
   return (
-    <div className={cn("backdrop-blur-xl bg-panel/30 border border-white/[0.04] rounded-3xl p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300 hover:border-white/[0.08] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.8)] hover:-translate-y-0.5", className)}>
+    <div className={cn("backdrop-blur-xl bg-panel/30 border border-white/[0.04] rounded-3xl p-4 sm:p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300 hover:border-white/[0.08] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.8)] hover:-translate-y-0.5", className)}>
       {children}
     </div>
   );
@@ -62,7 +62,7 @@ export function StatCard({ title, value, icon: Icon, trend, className, color = '
       </div>
       <div>
         <p className="text-xs text-text-secondary font-bold uppercase tracking-wider">{title}</p>
-        <h3 className="text-3xl font-display font-black tracking-tight mt-1.5 text-white">{value}</h3>
+        <h3 className="text-xl sm:text-2xl lg:text-3xl font-display font-black tracking-tight mt-1.5 text-white">{value}</h3>
         {description && (
           <p className="text-[11px] text-text-secondary mt-2.5 font-medium flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-accent/40" />

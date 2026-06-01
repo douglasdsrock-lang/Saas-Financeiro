@@ -26,7 +26,6 @@ interface SidebarLayoutProps {
 }
 
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
@@ -93,7 +92,6 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
               <Link
                 key={item.path}
                 href={item.path}
-                onClick={() => setIsMobileMenuOpen(false)}
                 className={cn(
                   "flex items-center transition-all duration-300 font-medium relative group",
                   collapsed 
@@ -176,38 +174,99 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         <NavContent forceExpand={false} />
       </aside>
 
-      {/* Mobile Sidebar */}
-      <div className={cn(
-        "fixed inset-0 z-50 bg-black/70 backdrop-blur-md lg:hidden transition-all duration-300",
-        isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-      )}>
-        <aside className={cn(
-          "w-72 h-full bg-panel/40 backdrop-blur-2xl border-r border-white/[0.04] transition-transform duration-300",
-          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-        )}>
-          <NavContent forceExpand={true} />
-        </aside>
-      </div>
-
       {/* Main Content */}
       <main className="flex-1 min-w-0">
         {/* Mobile Header */}
         <header className="lg:hidden h-16 bg-panel/40 backdrop-blur-lg border-b border-white/[0.04] flex items-center justify-between px-6 sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-accent" />
-            <span className="font-display font-black tracking-tight">SaaS Financeiro</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-gradient-to-tr from-accent to-emerald-400 rounded-xl flex items-center justify-center text-white shadow-md shadow-accent/15">
+              <Wallet className="w-4.5 h-4.5" />
+            </div>
+            <span className="font-display font-black tracking-tight text-white">SaaS Financeiro</span>
           </div>
           <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 hover:bg-white/[0.05] rounded-xl text-text-secondary hover:text-white transition-all cursor-pointer"
+            onClick={signOut}
+            className="p-2 hover:bg-red-500/[0.06] border border-transparent hover:border-red-500/10 rounded-xl text-red-400 transition-all cursor-pointer"
+            title="Sair da conta"
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            <LogOut className="w-5 h-5" />
           </button>
         </header>
 
-        <div className="p-6 lg:px-8 lg:py-10 max-w-[1800px] mx-auto w-full">
+        {/* content wrapper with dynamic bottom padding to prevent overlap with bottom bar */}
+        <div className="p-6 pb-28 lg:px-8 lg:py-10 max-w-[1800px] mx-auto w-full">
           {children}
         </div>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="fixed bottom-0 left-0 right-0 lg:hidden bg-panel/85 backdrop-blur-2xl border-t border-white/[0.06] z-50 px-4 py-2 flex items-center justify-around h-20 shadow-[0_-10px_35px_rgba(0,0,0,0.6)]">
+          {/* Left 2 Items: Entradas, Saídas */}
+          <Link 
+            href="/entradas" 
+            className={cn(
+              "flex flex-col items-center gap-1.5 transition-all text-[10px] font-bold select-none",
+              pathname === '/entradas' ? "text-accent scale-105" : "text-text-secondary active:text-white"
+            )}
+          >
+            <TrendingUp className="w-5 h-5" />
+            <span>Entradas</span>
+          </Link>
+
+          <Link 
+            href="/saidas" 
+            className={cn(
+              "flex flex-col items-center gap-1.5 transition-all text-[10px] font-bold select-none",
+              pathname === '/saidas' ? "text-red-400 scale-105" : "text-text-secondary active:text-white"
+            )}
+          >
+            <TrendingDown className="w-5 h-5" />
+            <span>Saídas</span>
+          </Link>
+
+          {/* Center Item: Dashboard (Elevated, Glowing) */}
+          <Link 
+            href="/dashboard" 
+            className="relative -mt-7 flex flex-col items-center select-none"
+          >
+            <div className={cn(
+              "w-13 h-13 rounded-2xl flex items-center justify-center text-white transition-all shadow-xl shadow-accent/20 border border-white/[0.08]",
+              pathname === '/dashboard' 
+                ? "bg-gradient-to-tr from-accent to-emerald-400 border-accent text-white shadow-[0_0_20px_rgba(16,185,129,0.35)]" 
+                : "bg-[#12121a]/90 text-text-secondary border-white/[0.04]"
+            )}>
+              <LayoutDashboard className="w-5.5 h-5.5" />
+            </div>
+            <span className={cn(
+              "text-[9px] mt-1 font-extrabold tracking-wide transition-colors",
+              pathname === '/dashboard' ? "text-accent" : "text-text-secondary"
+            )}>
+              Dashboard
+            </span>
+          </Link>
+
+          {/* Right 2 Items: Investimentos, Cadastros */}
+          <Link 
+            href="/investimentos" 
+            className={cn(
+              "flex flex-col items-center gap-1.5 transition-all text-[10px] font-bold select-none",
+              pathname === '/investimentos' ? "text-blue-400 scale-105" : "text-text-secondary active:text-white"
+            )}
+          >
+            <Wallet className="w-5 h-5" />
+            <span>Investir</span>
+          </Link>
+
+          <Link 
+            href="/cadastros" 
+            className={cn(
+              "flex flex-col items-center gap-1.5 transition-all text-[10px] font-bold select-none",
+              pathname === '/cadastros' ? "text-purple-400 scale-105" : "text-text-secondary active:text-white"
+            )}
+          >
+            <PlusCircle className="w-5 h-5" />
+            <span>Cadastros</span>
+          </Link>
+        </nav>
       </main>
     </div>
   );
