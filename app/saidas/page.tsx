@@ -980,8 +980,8 @@ export default function SaidasPage() {
                     )}
                     {data.map((item) => (
                       <div key={item.id} className="p-4 bg-[#12121a]/40 border border-white/[0.04] rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-all duration-300 hover:border-red-500/10">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-center gap-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             <input 
                               type="checkbox"
                               checked={selectedExpenseIds.includes(item.id)}
@@ -997,18 +997,18 @@ export default function SaidasPage() {
                             <div className="w-9 h-9 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 shrink-0">
                               <TrendingDown className="w-4.5 h-4.5" />
                             </div>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <p className="font-bold text-white text-sm truncate">{item.description}</p>
                                 {item.is_fixed && (
-                                  <span className="text-[7px] bg-white/[0.04] text-text-secondary border border-white/[0.04] px-1 py-0.5 rounded font-black uppercase tracking-wider">Fixo</span>
+                                  <span className="text-[7px] bg-white/[0.04] text-text-secondary border border-white/[0.04] px-1.5 py-0.5 rounded font-black uppercase tracking-wider">Fixo</span>
                                 )}
                               </div>
                               <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
                             </div>
                           </div>
-                          <div className="text-right flex flex-col items-end">
-                            <p className="font-black text-red-500 text-base">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <div className="text-right flex flex-col items-end shrink-0">
+                            <p className="font-black text-red-500 text-sm whitespace-nowrap">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                             <span className={`px-2 py-0.5 mt-1 rounded text-[8px] font-bold uppercase tracking-wider ${item.status === 'pending' ? 'bg-yellow-500/10 border border-yellow-500/10 text-yellow-500' : 'bg-accent/10 border border-accent/10 text-accent'}`}>
                               {item.status === 'pending' ? 'Pendente' : 'Pago'}
                             </span>

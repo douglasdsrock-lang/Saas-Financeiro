@@ -408,8 +408,8 @@ export default function EntradasPage() {
               <div className="md:hidden space-y-4">
                 {data.map((item) => (
                   <div key={item.id} className="p-4 bg-[#12121a]/40 border border-white/[0.04] rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-all duration-300 hover:border-accent/10">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <input 
                           type="checkbox"
                           checked={selectedIncomeIds.includes(item.id)}
@@ -425,13 +425,13 @@ export default function EntradasPage() {
                         <div className="w-9 h-9 bg-accent/10 rounded-xl flex items-center justify-center text-accent shrink-0">
                           <TrendingUp className="w-4.5 h-4.5" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-bold text-white text-sm truncate">{item.description}</p>
                           <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
                         </div>
                       </div>
-                      <div className="text-right flex flex-col items-end">
-                        <p className="font-black text-accent text-base">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      <div className="text-right flex flex-col items-end shrink-0">
+                        <p className="font-black text-accent text-sm whitespace-nowrap">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         <span className={cn(
                           "px-2 py-0.5 mt-1 rounded text-[8px] uppercase font-bold tracking-wider",
                           item.status === 'pending' ? "bg-amber-500/10 text-amber-500 border border-amber-500/10" : "bg-green-500/10 text-green-500 border border-green-500/10"
