@@ -286,7 +286,7 @@ export default function InvestimentosPage() {
             Limpar Filtros
           </button>
 
-          <div className="ml-auto text-blue-500 font-bold px-4 bg-blue-500/10 py-2 rounded-xl">
+          <div className="w-full md:w-auto text-center md:ml-auto text-blue-500 font-bold px-4 bg-blue-500/10 py-2 rounded-xl">
             Total: R$ {totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </div>
         </div>
@@ -299,35 +299,85 @@ export default function InvestimentosPage() {
             ) : data.length === 0 ? (
               <div className="py-12 text-center text-text-secondary">Nenhum investimento registrado.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-border text-sm text-text-secondary">
-                      <th className="pb-4 w-10">
-                        <input 
-                          type="checkbox"
-                          checked={data.length > 0 && selectedInvestmentIds.length === data.length}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedInvestmentIds(data.map(item => item.id));
-                            } else {
-                              setSelectedInvestmentIds([]);
-                            }
-                          }}
-                          className="checkbox-custom"
-                        />
-                      </th>
-                      <th className="pb-4 font-medium">Data</th>
-                      <th className="pb-4 font-medium">Ativo/Descrição</th>
-                      <th className="pb-4 font-medium">Categoria</th>
-                      <th className="pb-4 font-medium">Valor</th>
-                      <th className="pb-4 font-medium text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {data.map((item) => (
-                      <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
-                        <td className="py-4">
+              <>
+                {/* Desktop View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border text-sm text-text-secondary">
+                        <th className="pb-4 w-10">
+                          <input 
+                            type="checkbox"
+                            checked={data.length > 0 && selectedInvestmentIds.length === data.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedInvestmentIds(data.map(item => item.id));
+                              } else {
+                                setSelectedInvestmentIds([]);
+                              }
+                            }}
+                            className="checkbox-custom"
+                          />
+                        </th>
+                        <th className="pb-4 font-medium">Data</th>
+                        <th className="pb-4 font-medium">Ativo/Descrição</th>
+                        <th className="pb-4 font-medium">Categoria</th>
+                        <th className="pb-4 font-medium">Valor</th>
+                        <th className="pb-4 font-medium text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {data.map((item) => (
+                        <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
+                          <td className="py-4">
+                            <input 
+                              type="checkbox"
+                              checked={selectedInvestmentIds.includes(item.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedInvestmentIds(prev => [...prev, item.id]);
+                                } else {
+                                  setSelectedInvestmentIds(prev => prev.filter(id => id !== item.id));
+                                }
+                              }}
+                              className="checkbox-custom"
+                            />
+                          </td>
+                          <td className="py-4 text-sm">{formatDate(item.date)}</td>
+                          <td className="py-4 font-medium">
+                            <div>
+                              <p>{item.asset_name}</p>
+                              <p className="text-[10px] text-text-secondary uppercase">{item.banks?.name}</p>
+                            </div>
+                          </td>
+                          <td className="py-4 text-sm">
+                            <span className="px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 text-[10px] uppercase font-bold">
+                              {item.categories?.name}
+                            </span>
+                          </td>
+                          <td className="py-4 font-bold text-blue-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="py-4 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                              <button onClick={() => openEdit(item)} className="p-2 hover:bg-neutral-700 rounded-lg text-text-secondary">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-red-500">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card List View */}
+                <div className="md:hidden space-y-4">
+                  {data.map((item) => (
+                    <div key={item.id} className="p-4 bg-[#12121a]/40 border border-white/[0.04] rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-all duration-300 hover:border-blue-500/10">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
                           <input 
                             type="checkbox"
                             checked={selectedInvestmentIds.includes(item.id)}
@@ -338,37 +388,54 @@ export default function InvestimentosPage() {
                                 setSelectedInvestmentIds(prev => prev.filter(id => id !== item.id));
                               }
                             }}
-                            className="checkbox-custom"
+                            className="checkbox-custom shrink-0"
                           />
-                        </td>
-                        <td className="py-4 text-sm">{formatDate(item.date)}</td>
-                        <td className="py-4 font-medium">
-                          <div>
-                            <p>{item.asset_name}</p>
-                            <p className="text-[10px] text-text-secondary uppercase">{item.banks?.name}</p>
+                          <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
+                            <Wallet className="w-4.5 h-4.5" />
                           </div>
-                        </td>
-                        <td className="py-4 text-sm">
-                          <span className="px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 text-[10px] uppercase font-bold">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-white text-sm truncate">{item.asset_name}</p>
+                            <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end shrink-0">
+                          <p className="font-black text-blue-500 text-sm whitespace-nowrap">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between pt-2.5 border-t border-white/[0.04] gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[9px] uppercase font-bold tracking-wider">
                             {item.categories?.name}
                           </span>
-                        </td>
-                        <td className="py-4 font-bold text-blue-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        <td className="py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEdit(item)} className="p-2 hover:bg-neutral-700 rounded-lg text-text-secondary">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-red-500">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          {item.banks?.name && (
+                            <span className="text-[9px] text-text-secondary bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md">
+                              {item.banks.name}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button 
+                            onClick={() => openEdit(item)} 
+                            className="p-2 hover:bg-neutral-800 rounded-xl text-text-secondary hover:text-white"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => setDeleteConfirmId(item.id)} 
+                            className="p-2 hover:bg-red-500/10 rounded-xl text-red-500"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </Card>
 
