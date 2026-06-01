@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { handleSupabaseError, formatDate, cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
-import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Filter, Calendar as CalendarIcon, AlertCircle, RefreshCcw, Check, TrendingUp } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import SidebarLayout from '@/components/sidebar-layout';
