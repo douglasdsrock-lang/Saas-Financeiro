@@ -441,8 +441,14 @@ export default function DashboardPage() {
 
       const totalIncome = paidIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
-      // Total Expense: Only what is actually PAID (excluding statement payments since they are filtered in paidExpenses)
-      const totalPaidExpense = paidExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+      // Total Expense (Regime de Caixa): Pagamentos em dinheiro/pix/débito + Pagamentos de Fatura de Cartão
+      // Exclui compras individuais no cartão de crédito, pois elas só afetam o caixa no pagamento da fatura
+      const cashBasisExpenses = allPaidExpenses.filter((e: any) => {
+        const expenseDateStr = e.date.split('T')[0];
+        const isCreditCardPurchase = e.payment_method === 'Cartão de Crédito' || e.payment_method === 'Cartão de crédito';
+        return expenseDateStr >= startStr && expenseDateStr <= endStr && !isCreditCardPurchase;
+      });
+      const totalPaidExpense = cashBasisExpenses.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       
       const totalInvestedAllTime = investments.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
       const currentMonthInvested = investments
@@ -501,7 +507,7 @@ export default function DashboardPage() {
         if (dailyData[day - 1]) dailyData[day - 1].entradas += Number(i.amount);
       });
 
-      paidExpenses.forEach((i: any) => {
+      cashBasisExpenses.forEach((i: any) => {
         const day = parseInt(i.date.split('T')[0].split('-')[2], 10);
         if (dailyData[day - 1]) dailyData[day - 1].saidas += Number(i.amount);
       });
@@ -545,8 +551,11 @@ export default function DashboardPage() {
       // Process Projection Data (Previous + Current + 2 Months)
       const projection: any[] = [];
       const prevTotalIncome = prevIncomes.reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-      const prevPaidExpensesList = prevExpenses.filter((e: any) => !isStatementPayment(e));
-      const prevTotalExpense = prevPaidExpensesList.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+      const prevCashBasisExpenses = prevExpenses.filter((e: any) => {
+        const isCreditCardPurchase = e.payment_method === 'Cartão de Crédito' || e.payment_method === 'Cartão de crédito';
+        return !isCreditCardPurchase;
+      });
+      const prevTotalExpense = prevCashBasisExpenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
 
       for (let i = -1; i <= 2; i++) {
         const targetDate = addMonths(currentDate, i);
