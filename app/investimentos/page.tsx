@@ -17,6 +17,7 @@ export default function InvestimentosPage() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [isUpdateBalanceModalOpen, setIsUpdateBalanceModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
@@ -138,6 +139,52 @@ export default function InvestimentosPage() {
     }
   };
 
+  const onUpdateBalanceSubmit = async (formData: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const dateToSave = formData.date.includes('T') ? formData.date : `${formData.date}T12:00:00`;
+      const novoSaldo = Number(formData.novo_saldo);
+      
+      const transacoesAtivo = data.filter(item => item.asset_name.toLowerCase() === formData.asset_name.toLowerCase());
+      
+      let saldoAtualAtivo = transacoesAtivo.reduce((sum, item) => {
+        if (item.type === 'aporte' || item.type === 'rendimento') return sum + Number(item.amount);
+        if (item.type === 'resgate') return sum - Number(item.amount);
+        return sum;
+      }, 0);
+
+      const diferenca = novoSaldo - saldoAtualAtivo;
+
+      if (diferenca === 0) {
+        alert('O saldo atual informado é igual ao saldo registrado no sistema. Nenhuma alteração necessária.');
+        return;
+      }
+
+      const payload = {
+        asset_name: formData.asset_name,
+        amount: diferenca,
+        date: dateToSave,
+        category_id: formData.category_id,
+        bank_id: formData.bank_id,
+        type: 'rendimento',
+        notes: 'Atualização de Saldo Automática',
+        user_id: user.id
+      };
+
+      const { error } = await supabase.from('investments').insert([payload]);
+      if (error) throw error;
+
+      setIsUpdateBalanceModalOpen(false);
+      reset();
+      fetchData();
+    } catch (error: any) {
+      console.error('Error updating balance:', error);
+      alert(`Erro ao atualizar saldo: ${error.message}`);
+    }
+  };
+
   const openEdit = (item: any) => {
     setEditingItem(item);
     Object.keys(item).forEach(key => {
@@ -173,8 +220,29 @@ export default function InvestimentosPage() {
     }
   };
 
-  const totalInvested = data.reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalInvested = data.reduce((sum, item) => {
+    if (item.type === 'aporte') return sum + Number(item.amount);
+    if (item.type === 'resgate') return sum - Number(item.amount);
+    return sum;
+  }, 0);
+
+  const totalYield = data.reduce((sum, item) => {
+    if (item.type === 'rendimento') return sum + Number(item.amount);
+    return sum;
+  }, 0);
+
+  const grossBalance = totalInvested + totalYield;
   
+  const uniqueAssets = React.useMemo(() => {
+    const assets = new Map();
+    data.forEach(item => {
+      if (!assets.has(item.asset_name)) {
+        assets.set(item.asset_name, item);
+      }
+    });
+    return Array.from(assets.values());
+  }, [data]);
+
   const chartData = React.useMemo(() => {
     const map: Record<string, number> = {};
     data.forEach(item => {
@@ -194,12 +262,20 @@ export default function InvestimentosPage() {
             <h1 className="text-3xl font-bold">Investimentos</h1>
             <p className="text-text-secondary">Acompanhamento de aportes e patrimônio</p>
           </div>
-          <button 
-            onClick={() => { setEditingItem(null); reset(); setIsModalOpen(true); }}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> Novo Aporte
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => { setIsUpdateBalanceModalOpen(true); reset(); setValue('date', format(new Date(), 'yyyy-MM-dd')); }}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <RefreshCcw className="w-4 h-4" /> Atualizar Saldo
+            </button>
+            <button 
+              onClick={() => { setEditingItem(null); reset(); setValue('type', 'aporte'); setValue('date', format(new Date(), 'yyyy-MM-dd')); setIsModalOpen(true); }}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Novo Lançamento
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -217,22 +293,22 @@ export default function InvestimentosPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <StatCard 
-            title="Total Investido" 
-            value={`R$ ${totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            title="Saldo Bruto" 
+            value={`R$ ${grossBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={Wallet}
             color="blue"
           />
           <StatCard 
-            title="Aportes este Mês" 
-            value={`R$ ${data.filter(i => new Date(i.date).getMonth() === new Date().getMonth()).reduce((sum, i) => sum + Number(i.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            title="Total Investido" 
+            value={`R$ ${totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
             icon={ArrowUpRight}
             color="accent"
           />
           <StatCard 
-            title="Diversificação" 
-            value={`${chartData.length} Categorias`}
-            icon={PieChart}
-            color="purple"
+            title="Rendimentos" 
+            value={`R$ ${totalYield.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+            icon={TrendingUp}
+            color="green"
           />
         </div>
 
@@ -287,7 +363,7 @@ export default function InvestimentosPage() {
           </button>
 
           <div className="w-full md:w-auto text-center md:ml-auto text-blue-500 font-bold px-4 bg-blue-500/10 py-2 rounded-xl">
-            Total: R$ {totalInvested.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            Total na Lista: R$ {data.reduce((sum, item) => sum + (item.type === 'resgate' ? -Number(item.amount) : Number(item.amount)), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </div>
         </div>
 
@@ -345,8 +421,14 @@ export default function InvestimentosPage() {
                           </td>
                           <td className="py-4 text-sm">{formatDate(item.date)}</td>
                           <td className="py-4 font-medium">
-                            <div>
-                              <p>{item.asset_name}</p>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <p>{item.asset_name}</p>
+                                {item.type === 'aporte' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
+                                {item.type === 'rendimento' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-green-500/10 text-green-500">Rendimento</span>}
+                                {item.type === 'resgate' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-orange-500/10 text-orange-500">Resgate</span>}
+                                {(!item.type || (item.type !== 'aporte' && item.type !== 'rendimento' && item.type !== 'resgate')) && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
+                              </div>
                               <p className="text-[10px] text-text-secondary uppercase">{item.banks?.name}</p>
                             </div>
                           </td>
@@ -394,7 +476,12 @@ export default function InvestimentosPage() {
                             <Wallet className="w-4.5 h-4.5" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="font-bold text-white text-sm truncate">{item.asset_name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-white text-sm truncate">{item.asset_name}</p>
+                              {item.type === 'aporte' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
+                              {item.type === 'rendimento' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-green-500/10 text-green-500">Rendimento</span>}
+                              {item.type === 'resgate' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-orange-500/10 text-orange-500">Resgate</span>}
+                            </div>
                             <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
                           </div>
                         </div>
@@ -547,16 +634,26 @@ export default function InvestimentosPage() {
         <Modal 
           isOpen={isModalOpen} 
           onClose={() => setIsModalOpen(false)} 
-          title={editingItem ? 'Editar Aporte' : 'Novo Aporte'}
+          title={editingItem ? 'Editar Lançamento' : 'Novo Lançamento'}
         >
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Ativo / Descrição</label>
-              <input {...register('asset_name')} className="input-field" placeholder="Ex: PETR4, Tesouro Selic 2029..." required />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Ativo / Descrição</label>
+                <input {...register('asset_name')} className="input-field" placeholder="Ex: PETR4, Tesouro..." required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tipo de Lançamento</label>
+                <select {...register('type')} className="input-field" required>
+                  <option value="aporte">Aporte (Investimento)</option>
+                  <option value="resgate">Resgate (Retirada)</option>
+                  <option value="rendimento">Rendimento Manual</option>
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Valor do Aporte</label>
+                <label className="block text-sm font-medium mb-1">Valor</label>
                 <input type="number" step="0.01" {...register('amount')} className="input-field" required />
               </div>
               <div>
@@ -587,6 +684,57 @@ export default function InvestimentosPage() {
             <div className="pt-4 flex gap-3">
               <button type="button" onClick={() => setIsModalOpen(false)} className="btn-secondary flex-1">Cancelar</button>
               <button type="submit" className="btn-primary flex-1">Salvar</button>
+            </div>
+          </form>
+        </Modal>
+
+        <Modal 
+          isOpen={isUpdateBalanceModalOpen} 
+          onClose={() => setIsUpdateBalanceModalOpen(false)} 
+          title="Atualizar Saldo"
+        >
+          <form onSubmit={handleSubmit(onUpdateBalanceSubmit)} className="space-y-4">
+            <p className="text-sm text-text-secondary mb-4">
+              Selecione o ativo e informe o saldo total atual dele. O sistema criará um lançamento de rendimento automaticamente com a diferença.
+            </p>
+            <div>
+              <label className="block text-sm font-medium mb-1">Selecione o Ativo</label>
+              <select 
+                className="input-field" 
+                required
+                onChange={(e) => {
+                  const selected = uniqueAssets.find(a => a.asset_name === e.target.value);
+                  if (selected) {
+                    setValue('asset_name', selected.asset_name);
+                    setValue('category_id', selected.category_id);
+                    setValue('bank_id', selected.bank_id);
+                  } else {
+                    setValue('asset_name', '');
+                  }
+                }}
+              >
+                <option value="">Selecione...</option>
+                {uniqueAssets.map((a: any) => (
+                  <option key={a.asset_name} value={a.asset_name}>{a.asset_name}</option>
+                ))}
+              </select>
+              <input type="hidden" {...register('asset_name')} />
+              <input type="hidden" {...register('category_id')} />
+              <input type="hidden" {...register('bank_id')} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Novo Saldo Total (R$)</label>
+                <input type="number" step="0.01" {...register('novo_saldo')} className="input-field" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Data da Atualização</label>
+                <input type="date" {...register('date')} className="input-field" required />
+              </div>
+            </div>
+            <div className="pt-4 flex gap-3">
+              <button type="button" onClick={() => setIsUpdateBalanceModalOpen(false)} className="btn-secondary flex-1">Cancelar</button>
+              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex-1 transition-colors">Atualizar Saldo</button>
             </div>
           </form>
         </Modal>
