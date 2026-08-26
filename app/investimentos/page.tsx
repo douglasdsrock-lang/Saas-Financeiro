@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { handleSupabaseError, formatDate } from '@/lib/utils';
 import { Card, StatCard } from '@/components/ui/card';
 import Modal from '@/components/ui/modal';
-import { Plus, Edit2, Trash2, TrendingUp, Wallet, PieChart, AlertCircle, RefreshCcw, ArrowUpRight, ArrowDownRight, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, TrendingUp, Wallet, PieChart, AlertCircle, RefreshCcw, ArrowUpRight, ArrowDownRight, Search, List } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { format } from 'date-fns';
 import SidebarLayout from '@/components/sidebar-layout';
@@ -30,6 +30,7 @@ export default function InvestimentosPage() {
 
   const { register, handleSubmit, reset, setValue } = useForm();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [selectedHistoryAsset, setSelectedHistoryAsset] = useState<any | null>(null);
 
   // Bulk Selection States
   const [selectedInvestmentIds, setSelectedInvestmentIds] = useState<string[]>([]);
@@ -233,15 +234,35 @@ export default function InvestimentosPage() {
 
   const grossBalance = totalInvested + totalYield;
   
-  const uniqueAssets = React.useMemo(() => {
-    const assets = new Map();
+  const groupedAssets = React.useMemo(() => {
+    const map = new Map();
     data.forEach(item => {
-      if (!assets.has(item.asset_name)) {
-        assets.set(item.asset_name, item);
+      if (!map.has(item.asset_name)) {
+        map.set(item.asset_name, {
+          asset_name: item.asset_name,
+          category: item.categories?.name,
+          category_id: item.category_id,
+          bank: item.banks?.name,
+          bank_id: item.bank_id,
+          totalAportes: 0,
+          totalRendimentos: 0,
+          transactions: []
+        });
       }
+      const asset = map.get(item.asset_name);
+      asset.transactions.push(item);
+      if (item.type === 'aporte') asset.totalAportes += Number(item.amount);
+      if (item.type === 'resgate') asset.totalAportes -= Number(item.amount);
+      if (item.type === 'rendimento') asset.totalRendimentos += Number(item.amount);
     });
-    return Array.from(assets.values());
+
+    return Array.from(map.values()).map(asset => ({
+      ...asset,
+      saldoTotal: asset.totalAportes + asset.totalRendimentos
+    })).sort((a, b) => b.saldoTotal - a.saldoTotal);
   }, [data]);
+
+  const uniqueAssets = groupedAssets;
 
   const chartData = React.useMemo(() => {
     const map: Record<string, number> = {};
@@ -369,160 +390,85 @@ export default function InvestimentosPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <Card className="lg:col-span-2">
-            <h3 className="text-xl font-bold mb-6">Histórico de Aportes</h3>
+            <h3 className="text-xl font-bold mb-6">Meus Investimentos</h3>
             {loading ? (
               <div className="py-12 text-center text-text-secondary">Carregando...</div>
-            ) : data.length === 0 ? (
+            ) : groupedAssets.length === 0 ? (
               <div className="py-12 text-center text-text-secondary">Nenhum investimento registrado.</div>
             ) : (
-              <>
-                {/* Desktop View */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-border text-sm text-text-secondary">
-                        <th className="pb-4 w-10">
-                          <input 
-                            type="checkbox"
-                            checked={data.length > 0 && selectedInvestmentIds.length === data.length}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedInvestmentIds(data.map(item => item.id));
-                              } else {
-                                setSelectedInvestmentIds([]);
-                              }
-                            }}
-                            className="checkbox-custom"
-                          />
-                        </th>
-                        <th className="pb-4 font-medium">Data</th>
-                        <th className="pb-4 font-medium">Ativo/Descrição</th>
-                        <th className="pb-4 font-medium">Categoria</th>
-                        <th className="pb-4 font-medium">Valor</th>
-                        <th className="pb-4 font-medium text-right">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {data.map((item) => (
-                        <tr key={item.id} className="group hover:bg-neutral-800/30 transition-colors">
-                          <td className="py-4">
-                            <input 
-                              type="checkbox"
-                              checked={selectedInvestmentIds.includes(item.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedInvestmentIds(prev => [...prev, item.id]);
-                                } else {
-                                  setSelectedInvestmentIds(prev => prev.filter(id => id !== item.id));
-                                }
-                              }}
-                              className="checkbox-custom"
-                            />
-                          </td>
-                          <td className="py-4 text-sm">{formatDate(item.date)}</td>
-                          <td className="py-4 font-medium">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2">
-                                <p>{item.asset_name}</p>
-                                {item.type === 'aporte' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
-                                {item.type === 'rendimento' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-green-500/10 text-green-500">Rendimento</span>}
-                                {item.type === 'resgate' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-orange-500/10 text-orange-500">Resgate</span>}
-                                {(!item.type || (item.type !== 'aporte' && item.type !== 'rendimento' && item.type !== 'resgate')) && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
-                              </div>
-                              <p className="text-[10px] text-text-secondary uppercase">{item.banks?.name}</p>
-                            </div>
-                          </td>
-                          <td className="py-4 text-sm">
-                            <span className="px-2 py-1 rounded-md bg-blue-500/10 text-blue-500 text-[10px] uppercase font-bold">
-                              {item.categories?.name}
-                            </span>
-                          </td>
-                          <td className="py-4 font-bold text-blue-500">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                          <td className="py-4 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                              <button onClick={() => openEdit(item)} className="p-2 hover:bg-neutral-700 rounded-lg text-text-secondary">
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => setDeleteConfirmId(item.id)} className="p-2 hover:bg-red-500/10 rounded-lg text-red-500">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Mobile Card List View */}
-                <div className="md:hidden space-y-4">
-                  {data.map((item) => (
-                    <div key={item.id} className="p-4 bg-[#12121a]/40 border border-white/[0.04] rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-all duration-300 hover:border-blue-500/10">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <input 
-                            type="checkbox"
-                            checked={selectedInvestmentIds.includes(item.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedInvestmentIds(prev => [...prev, item.id]);
-                              } else {
-                                setSelectedInvestmentIds(prev => prev.filter(id => id !== item.id));
-                              }
-                            }}
-                            className="checkbox-custom shrink-0"
-                          />
-                          <div className="w-9 h-9 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
-                            <Wallet className="w-4.5 h-4.5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="font-bold text-white text-sm truncate">{item.asset_name}</p>
-                              {item.type === 'aporte' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
-                              {item.type === 'rendimento' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-green-500/10 text-green-500">Rendimento</span>}
-                              {item.type === 'resgate' && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase font-bold bg-orange-500/10 text-orange-500">Resgate</span>}
-                            </div>
-                            <p className="text-[10px] text-text-secondary mt-0.5">{formatDate(item.date)}</p>
-                          </div>
-                        </div>
-                        <div className="text-right flex flex-col items-end shrink-0">
-                          <p className="font-black text-blue-500 text-sm whitespace-nowrap">R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                        </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {groupedAssets.map((asset) => (
+                  <div key={asset.asset_name} className="p-5 bg-[#12121a]/80 border border-white/[0.04] rounded-2xl flex flex-col gap-4 relative overflow-hidden group hover:border-accent/30 transition-all shadow-sm">
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex gap-3 items-center min-w-0">
+                         <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent shrink-0">
+                           <Wallet className="w-5 h-5" />
+                         </div>
+                         <div className="min-w-0">
+                           <h4 className="font-bold text-lg text-white truncate" title={asset.asset_name}>{asset.asset_name}</h4>
+                           <div className="flex gap-2 items-center text-xs text-text-secondary mt-0.5">
+                             <span className="bg-white/5 px-2 py-0.5 rounded-md truncate">{asset.category || 'Sem Categoria'}</span>
+                             {asset.bank && <span className="bg-white/5 px-2 py-0.5 rounded-md truncate">{asset.bank}</span>}
+                           </div>
+                         </div>
                       </div>
+                      <button 
+                        onClick={() => setSelectedHistoryAsset(asset)}
+                        className="text-xs font-semibold text-text-secondary hover:text-white flex items-center gap-1 bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition-colors shrink-0"
+                      >
+                        <List className="w-3.5 h-3.5" /> Histórico
+                      </button>
+                    </div>
 
-                      <div className="flex flex-wrap items-center justify-between pt-2.5 border-t border-white/[0.04] gap-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-500 text-[9px] uppercase font-bold tracking-wider">
-                            {item.categories?.name}
-                          </span>
-                          {item.banks?.name && (
-                            <span className="text-[9px] text-text-secondary bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md">
-                              {item.banks.name}
-                            </span>
-                          )}
-                        </div>
+                    <div className="mt-2">
+                       <p className="text-sm text-text-secondary mb-1 font-medium">Saldo Total</p>
+                       <p className="text-2xl font-black text-accent tracking-tight">R$ {asset.saldoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
 
-                        <div className="flex items-center gap-1 ml-auto">
-                          <button 
-                            onClick={() => openEdit(item)} 
-                            className="p-2 hover:bg-neutral-800 rounded-xl text-text-secondary hover:text-white"
-                            title="Editar"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => setDeleteConfirmId(item.id)} 
-                            className="p-2 hover:bg-red-500/10 rounded-xl text-red-500"
-                            title="Excluir"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-white/[0.04]">
+                      <div>
+                        <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-0.5">Total Aportado</p>
+                        <p className="text-sm font-bold text-blue-500">R$ {asset.totalAportes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-0.5">Rendimentos</p>
+                        <p className="text-sm font-bold text-green-500">R$ {asset.totalRendimentos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </>
+
+                    <div className="flex gap-2 pt-2 mt-1">
+                       <button 
+                          onClick={() => {
+                            setEditingItem(null);
+                            reset();
+                            setValue('type', 'aporte');
+                            setValue('date', format(new Date(), 'yyyy-MM-dd'));
+                            setValue('asset_name', asset.asset_name);
+                            setValue('category_id', asset.category_id);
+                            setValue('bank_id', asset.bank_id);
+                            setIsModalOpen(true);
+                          }}
+                          className="flex-1 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                       >
+                         <Plus className="w-3.5 h-3.5" /> Aporte
+                       </button>
+                       <button 
+                          onClick={() => {
+                            reset();
+                            setValue('date', format(new Date(), 'yyyy-MM-dd'));
+                            setValue('asset_name', asset.asset_name);
+                            setValue('category_id', asset.category_id);
+                            setValue('bank_id', asset.bank_id);
+                            setIsUpdateBalanceModalOpen(true);
+                          }}
+                          className="flex-1 py-2.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                       >
+                         <RefreshCcw className="w-3.5 h-3.5" /> Atualizar
+                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </Card>
 
@@ -737,6 +683,45 @@ export default function InvestimentosPage() {
               <button type="submit" className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl flex-1 transition-colors">Atualizar Saldo</button>
             </div>
           </form>
+        </Modal>
+
+        <Modal 
+          isOpen={!!selectedHistoryAsset} 
+          onClose={() => setSelectedHistoryAsset(null)} 
+          title={`Histórico: ${selectedHistoryAsset?.asset_name}`}
+        >
+          <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+             {selectedHistoryAsset?.transactions.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item: any) => (
+                <div key={item.id} className="p-4 bg-panel border border-border rounded-xl flex items-center justify-between group">
+                   <div>
+                     <div className="flex items-center gap-2 mb-1.5">
+                        {item.type === 'aporte' && <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
+                        {item.type === 'rendimento' && <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-green-500/10 text-green-500">Rendimento</span>}
+                        {item.type === 'resgate' && <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-orange-500/10 text-orange-500">Resgate</span>}
+                        {(!item.type || (item.type !== 'aporte' && item.type !== 'rendimento' && item.type !== 'resgate')) && <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-500/10 text-blue-500">Aporte</span>}
+                     </div>
+                     <p className="text-sm font-semibold">{formatDate(item.date)}</p>
+                     {item.notes && <p className="text-xs text-text-secondary mt-1">{item.notes}</p>}
+                   </div>
+                   <div className="text-right flex flex-col justify-between h-full">
+                     <p className={`font-black text-sm ${item.type === 'resgate' ? 'text-orange-500' : 'text-white'}`}>
+                        {item.type === 'resgate' ? '-' : ''}R$ {Number(item.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                     </p>
+                     <div className="flex items-center justify-end gap-1 mt-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setSelectedHistoryAsset(null); openEdit(item); }} className="p-1.5 hover:bg-white/10 rounded-lg text-text-secondary transition-colors" title="Editar">
+                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => { setSelectedHistoryAsset(null); setDeleteConfirmId(item.id); }} className="p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors" title="Excluir">
+                           <Trash2 className="w-4 h-4" />
+                        </button>
+                     </div>
+                   </div>
+                </div>
+             ))}
+             {selectedHistoryAsset?.transactions.length === 0 && (
+                <p className="text-center text-text-secondary py-8">Nenhuma movimentação encontrada.</p>
+             )}
+          </div>
         </Modal>
       </div>
     </SidebarLayout>
