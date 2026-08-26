@@ -690,6 +690,23 @@ export default function InvestimentosPage() {
           onClose={() => setSelectedHistoryAsset(null)} 
           title={`Histórico: ${selectedHistoryAsset?.asset_name}`}
         >
+          {selectedHistoryAsset?.transactions?.length > 0 && (
+            <div className="flex justify-end mb-4 border-b border-white/[0.04] pb-4">
+              <button 
+                onClick={() => {
+                  if (selectedHistoryAsset) {
+                    const ids = selectedHistoryAsset.transactions.map((t: any) => t.id);
+                    setSelectedInvestmentIds(ids);
+                    setSelectedHistoryAsset(null);
+                    setIsBulkDeleteConfirmOpen(true);
+                  }
+                }}
+                className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-red-500/20"
+              >
+                <Trash2 className="w-4 h-4" /> Excluir Ativo Inteiro
+              </button>
+            </div>
+          )}
           <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-3 custom-scrollbar">
              {selectedHistoryAsset?.transactions.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((item: any) => (
                 <div key={item.id} className="p-4 bg-panel border border-border rounded-xl flex items-center justify-between group">
