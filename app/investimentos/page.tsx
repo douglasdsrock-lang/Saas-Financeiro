@@ -27,6 +27,7 @@ export default function InvestimentosPage() {
   
   const [categories, setCategories] = useState<any[]>([]);
   const [banks, setBanks] = useState<any[]>([]);
+  const [people, setPeople] = useState<any[]>([]);
 
   const { register, handleSubmit, reset, setValue } = useForm();
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -51,12 +52,14 @@ export default function InvestimentosPage() {
         return data || [];
       };
 
-      const [c, b] = await Promise.all([
+      const [c, b, p] = await Promise.all([
         fetchTable('categories', supabase.from('categories').select('*').eq('type', 'investment').eq('user_id', user.id)),
-        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id))
+        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id))
       ]);
       setCategories(c);
       setBanks(b);
+      setPeople(p);
     } catch (error) {
       console.error('Error fetching helpers:', error);
     }
@@ -73,7 +76,7 @@ export default function InvestimentosPage() {
 
       let query = supabase
         .from('investments')
-        .select('*, categories(name), banks(name)')
+        .select('*, categories(name), banks(name), people(name)')
         .eq('user_id', user.id);
 
       if (filters.category) {
@@ -118,6 +121,7 @@ export default function InvestimentosPage() {
         date: dateToSave,
         category_id: formData.category_id,
         bank_id: formData.bank_id,
+        person_id: formData.person_id,
         notes: formData.notes || null,
         user_id: user.id
       };
@@ -169,6 +173,7 @@ export default function InvestimentosPage() {
         date: dateToSave,
         category_id: formData.category_id,
         bank_id: formData.bank_id,
+        person_id: formData.person_id,
         type: 'rendimento',
         notes: 'Atualização de Saldo Automática',
         user_id: user.id
@@ -244,6 +249,8 @@ export default function InvestimentosPage() {
           category_id: item.category_id,
           bank: item.banks?.name,
           bank_id: item.bank_id,
+          person: item.people?.name,
+          person_id: item.person_id,
           totalAportes: 0,
           totalRendimentos: 0,
           transactions: []
@@ -409,6 +416,7 @@ export default function InvestimentosPage() {
                            <div className="flex gap-2 items-center text-xs text-text-secondary mt-0.5">
                              <span className="bg-white/5 px-2 py-0.5 rounded-md truncate">{asset.category || 'Sem Categoria'}</span>
                              {asset.bank && <span className="bg-white/5 px-2 py-0.5 rounded-md truncate">{asset.bank}</span>}
+                             {asset.person && <span className="bg-white/5 px-2 py-0.5 rounded-md truncate">{asset.person}</span>}
                            </div>
                          </div>
                       </div>
@@ -446,6 +454,7 @@ export default function InvestimentosPage() {
                             setValue('asset_name', asset.asset_name);
                             setValue('category_id', asset.category_id);
                             setValue('bank_id', asset.bank_id);
+                            setValue('person_id', asset.person_id);
                             setIsModalOpen(true);
                           }}
                           className="flex-1 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
@@ -459,6 +468,7 @@ export default function InvestimentosPage() {
                             setValue('asset_name', asset.asset_name);
                             setValue('category_id', asset.category_id);
                             setValue('bank_id', asset.bank_id);
+                            setValue('person_id', asset.person_id);
                             setIsUpdateBalanceModalOpen(true);
                           }}
                           className="flex-1 py-2.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
@@ -591,9 +601,9 @@ export default function InvestimentosPage() {
               <div>
                 <label className="block text-sm font-medium mb-1">Tipo de Lançamento</label>
                 <select {...register('type')} className="input-field" required>
-                  <option value="aporte">Aporte (Investimento)</option>
-                  <option value="resgate">Resgate (Retirada)</option>
-                  <option value="rendimento">Rendimento Manual</option>
+                  <option value="aporte" className="bg-[#0c0c10] text-white">Aporte (Investimento)</option>
+                  <option value="resgate" className="bg-[#0c0c10] text-white">Resgate (Retirada)</option>
+                  <option value="rendimento" className="bg-[#0c0c10] text-white">Rendimento Manual</option>
                 </select>
               </div>
             </div>
@@ -607,19 +617,26 @@ export default function InvestimentosPage() {
                 <input type="date" {...register('date')} className="input-field" required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Categoria</label>
                 <select {...register('category_id')} className="input-field" required>
-                  <option value="">Selecione...</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                  {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0c0c10] text-white">{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Corretora / Banco</label>
+                <label className="block text-sm font-medium mb-1">Corretora/Banco</label>
                 <select {...register('bank_id')} className="input-field" required>
-                  <option value="">Selecione...</option>
-                  {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                  {banks.map(b => <option key={b.id} value={b.id} className="bg-[#0c0c10] text-white">{b.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Titular</label>
+                <select {...register('person_id')} className="input-field" required>
+                  <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                  {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
                 </select>
               </div>
             </div>
@@ -654,19 +671,21 @@ export default function InvestimentosPage() {
                     setValue('asset_name', selected.asset_name);
                     setValue('category_id', selected.category_id);
                     setValue('bank_id', selected.bank_id);
+                    setValue('person_id', selected.person_id);
                   } else {
                     setValue('asset_name', '');
                   }
                 }}
               >
-                <option value="">Selecione...</option>
+                <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
                 {uniqueAssets.map((a: any) => (
-                  <option key={a.asset_name} value={a.asset_name}>{a.asset_name}</option>
+                  <option key={a.asset_name} value={a.asset_name} className="bg-[#0c0c10] text-white">{a.asset_name}</option>
                 ))}
               </select>
               <input type="hidden" {...register('asset_name')} />
               <input type="hidden" {...register('category_id')} />
               <input type="hidden" {...register('bank_id')} />
+              <input type="hidden" {...register('person_id')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
