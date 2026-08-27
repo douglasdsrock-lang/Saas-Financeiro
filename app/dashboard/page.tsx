@@ -146,7 +146,7 @@ export default function DashboardPage() {
         fetchTable('recurring_bills', supabase.from('recurring_bills').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('recurring_incomes', supabase.from('recurring_incomes').select('*, categories(name)').eq('user_id', user.id).eq('active', true)),
         fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
-        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('banks', supabase.from('banks').select('*, people:person_id(name)').eq('user_id', user.id)),
         fetchTable('installments', supabase.from('installments').select('*').eq('user_id', user.id).eq('status', 'pending')),
         fetchTable('card_purchases_all', supabase.from('card_purchases').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('type', 'expense').eq('user_id', user.id)),

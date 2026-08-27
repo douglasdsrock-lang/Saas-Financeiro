@@ -74,7 +74,7 @@ export default function CadastrosPage() {
       const [p, c, b, cc, budgetsData] = await Promise.all([
         fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id)),
         fetchTable('categories', supabase.from('categories').select('*').eq('user_id', user.id)),
-        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('banks', supabase.from('banks').select('*, people:person_id(name)').eq('user_id', user.id)),
         fetchTable('credit_cards', supabase.from('credit_cards').select('*').eq('user_id', user.id)),
         fetchTable('category_budgets', supabase.from('category_budgets').select('*').eq('user_id', user.id))
       ]);
@@ -294,7 +294,7 @@ export default function CadastrosPage() {
                 <label className="block text-sm font-medium mb-1">Banco</label>
                 <select {...register('bank_id')} className="input-field" required>
                   <option value="">Selecione...</option>
-                  {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  {banks.map(b => <option key={b.id} value={b.id}>{b.name}{b.people?.name ? ` (${b.people.name})` : ''}</option>)}
                 </select>
               </div>
               <div>
@@ -413,7 +413,7 @@ export default function CadastrosPage() {
                 <label className="block text-sm font-medium mb-1">Banco de Recebimento</label>
                 <select {...register('bank_id')} className="input-field" required>
                   <option value="">Selecione...</option>
-                  {banks.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  {banks.map(b => <option key={b.id} value={b.id}>{b.name}{b.people?.name ? ` (${b.people.name})` : ''}</option>)}
                 </select>
               </div>
             )}

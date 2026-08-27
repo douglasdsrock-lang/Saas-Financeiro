@@ -54,7 +54,7 @@ export default function InvestimentosPage() {
 
       const [c, b, p] = await Promise.all([
         fetchTable('categories', supabase.from('categories').select('*').eq('type', 'investment').eq('user_id', user.id)),
-        fetchTable('banks', supabase.from('banks').select('*').eq('user_id', user.id)),
+        fetchTable('banks', supabase.from('banks').select('*, people:person_id(name)').eq('user_id', user.id)),
         fetchTable('people', supabase.from('people').select('*').eq('user_id', user.id))
       ]);
       setCategories(c);
@@ -629,7 +629,7 @@ export default function InvestimentosPage() {
                 <label className="block text-sm font-medium mb-1">Corretora/Banco</label>
                 <select {...register('bank_id')} className="input-field" required>
                   <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                  {banks.map(b => <option key={b.id} value={b.id} className="bg-[#0c0c10] text-white">{b.name}</option>)}
+                  {banks.map(b => <option key={b.id} value={b.id} className="bg-[#0c0c10] text-white">{b.name}{b.people?.name ? ` (${b.people.name})` : ''}</option>)}
                 </select>
               </div>
               <div>
