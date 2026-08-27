@@ -105,6 +105,8 @@ export default function CadastrosPage() {
       
       if (activeTab === 'recurring_bills') {
         query = supabase.from(activeTab).select('*, categories:category_id(name), people:responsible_id(name)').eq('user_id', user.id);
+      } else if (activeTab === 'banks') {
+        query = supabase.from(activeTab).select('*, people:person_id(name)').eq('user_id', user.id);
       } else if (activeTab === 'recurring_incomes') {
         query = supabase.from(activeTab).select('*, categories:category_id(name), people:person_id(name)').eq('user_id', user.id);
       }
@@ -138,7 +140,7 @@ export default function CadastrosPage() {
       const allowedFieldsMap: Record<string, string[]> = {
         people: ['name', 'color'],
         categories: ['name', 'type', 'color'],
-        banks: ['name', 'color'],
+        banks: ['name', 'color', 'person_id'],
         credit_cards: ['name', 'bank_id', 'holder_id', 'closing_day', 'due_day', 'limit_amount', 'active'],
         recurring_bills: ['name', 'amount', 'due_day', 'category_id', 'responsible_id', 'payment_method', 'credit_card_id', 'active'],
         recurring_incomes: ['name', 'amount', 'due_day', 'category_id', 'person_id', 'bank_id', 'active']
@@ -246,7 +248,6 @@ export default function CadastrosPage() {
   const renderFormFields = () => {
     switch (activeTab) {
       case 'people':
-      case 'banks':
         return (
           <div className="space-y-4">
             <div>
@@ -256,6 +257,28 @@ export default function CadastrosPage() {
             <div>
               <label className="block text-sm font-medium mb-1">Cor (Hex)</label>
               <input {...register('color')} className="input-field" placeholder="#000000" />
+            </div>
+          </div>
+        );
+      case 'banks':
+        return (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Nome</label>
+              <input {...register('name')} className="input-field" placeholder="Ex: Banco do Brasil" required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Cor (Hex)</label>
+                <input {...register('color')} className="input-field" placeholder="#000000" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Titular (Pessoa)</label>
+                <select {...register('person_id')} className="input-field" required>
+                  <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                  {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
         );
@@ -489,6 +512,11 @@ export default function CadastrosPage() {
                         {(activeTab === 'recurring_bills' || activeTab === 'recurring_incomes') && (
                           <p className="text-[10px] text-text-secondary uppercase mt-0.5">
                             {item.categories?.name} • {item.people?.name}
+                          </p>
+                        )}
+                        {activeTab === 'banks' && item.people?.name && (
+                          <p className="text-[10px] text-text-secondary uppercase mt-0.5">
+                            Titular: {item.people?.name}
                           </p>
                         )}
                       </td>
