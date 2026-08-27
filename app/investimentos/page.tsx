@@ -121,7 +121,7 @@ export default function InvestimentosPage() {
         date: dateToSave,
         category_id: formData.category_id,
         bank_id: formData.bank_id,
-        person_id: formData.person_id,
+        person_id: banks.find(b => b.id === formData.bank_id)?.person_id || null,
         notes: formData.notes || null,
         user_id: user.id
       };
@@ -173,7 +173,7 @@ export default function InvestimentosPage() {
         date: dateToSave,
         category_id: formData.category_id,
         bank_id: formData.bank_id,
-        person_id: formData.person_id,
+        person_id: banks.find(b => b.id === formData.bank_id)?.person_id || null,
         type: 'rendimento',
         notes: 'Atualização de Saldo Automática',
         user_id: user.id
@@ -454,7 +454,6 @@ export default function InvestimentosPage() {
                             setValue('asset_name', asset.asset_name);
                             setValue('category_id', asset.category_id);
                             setValue('bank_id', asset.bank_id);
-                            setValue('person_id', asset.person_id);
                             setIsModalOpen(true);
                           }}
                           className="flex-1 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
@@ -468,7 +467,6 @@ export default function InvestimentosPage() {
                             setValue('asset_name', asset.asset_name);
                             setValue('category_id', asset.category_id);
                             setValue('bank_id', asset.bank_id);
-                            setValue('person_id', asset.person_id);
                             setIsUpdateBalanceModalOpen(true);
                           }}
                           className="flex-1 py-2.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
@@ -617,7 +615,7 @@ export default function InvestimentosPage() {
                 <input type="date" {...register('date')} className="input-field" required />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Categoria</label>
                 <select {...register('category_id')} className="input-field" required>
@@ -632,13 +630,7 @@ export default function InvestimentosPage() {
                   {banks.map(b => <option key={b.id} value={b.id} className="bg-[#0c0c10] text-white">{b.name}{b.people?.name ? ` (${b.people.name})` : ''}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Titular</label>
-                <select {...register('person_id')} className="input-field" required>
-                  <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                  {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
-                </select>
-              </div>
+              
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Notas</label>
@@ -671,7 +663,6 @@ export default function InvestimentosPage() {
                     setValue('asset_name', selected.asset_name);
                     setValue('category_id', selected.category_id);
                     setValue('bank_id', selected.bank_id);
-                    setValue('person_id', selected.person_id);
                   } else {
                     setValue('asset_name', '');
                   }
@@ -685,8 +676,7 @@ export default function InvestimentosPage() {
               <input type="hidden" {...register('asset_name')} />
               <input type="hidden" {...register('category_id')} />
               <input type="hidden" {...register('bank_id')} />
-              <input type="hidden" {...register('person_id')} />
-            </div>
+              </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Novo Saldo Total (R$)</label>
