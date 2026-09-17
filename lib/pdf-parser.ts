@@ -2,6 +2,7 @@ import { extractText } from 'unpdf';
 
 export interface InterTransaction {
   date: string;
+  isoDate: string;
   description: string;
   value: number;
 }
@@ -11,6 +12,30 @@ const MONTH_MAP: Record<string, string> = {
   jan: '01', fev: '02', mar: '03', abr: '04', mai: '05', jun: '06',
   jul: '07', ago: '08', set: '09', out: '10', nov: '11', dez: '12'
 };
+
+function normalizeDateToIso(rawDate: string): string {
+  // Ex: "23 de abr. 2026" ou "23 de abr 2026"
+  const textDateMatch = rawDate.match(/^(\d{1,2})\s+de\s+([a-zA-ZçÇ]{3,4})\.?\s+(\d{4})$/i);
+  if (textDateMatch) {
+    const day = textDateMatch[1].padStart(2, '0');
+    const monthKey = textDateMatch[2].toLowerCase().substring(0, 3);
+    const month = MONTH_MAP[monthKey] || '01';
+    const year = textDateMatch[3];
+    return `${year}-${month}-${day}`;
+  }
+
+  // Ex: "23/04/2026"
+  const slashDateMatch = rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (slashDateMatch) {
+    const day = slashDateMatch[1].padStart(2, '0');
+    const month = slashDateMatch[2].padStart(2, '0');
+    let year = slashDateMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    return `${year}-${month}-${day}`;
+  }
+
+  return new Date().toISOString().split('T')[0];
+}
 
 export async function parseInterInvoice(data: Uint8Array | ArrayBuffer | Buffer): Promise<InterTransaction[]> {
   try {
@@ -29,7 +54,6 @@ export async function parseInterInvoice(data: Uint8Array | ArrayBuffer | Buffer)
     const transactions: InterTransaction[] = [];
 
     // Padrão 1: Linha única completa (ex: "23 de abr. 2026 MP *ROMININSULFIL (Parcela 04 de 04) - R$ 97,44" ou "16/02/2026 COMPRA R$ 50,00")
-    // Suporta: "23 de abr. 2026", "23 de abr 2026", "23/04/2026"
     const singleLineRegex = /^(\d{1,2}(?:\s+de\s+[a-zA-ZçÇ]{3,4}\.?\s+\d{4}|\/\d{2}\/\d{2,4}))\s+(.+?)(?:\s+-\s+|\s+)?(?:R\$\s*)?([\d.,]+)$/i;
 
     // Padrão 2: Data no início de linha
@@ -63,12 +87,17 @@ export async function parseInterInvoice(data: Uint8Array | ArrayBuffer | Buffer)
         const value = parseFloat(rawVal);
 
         if (!isNaN(value) && value > 0 && description.length > 1) {
-          transactions.push({ date: rawDate, description, value });
+          transactions.push({ 
+            date: rawDate, 
+            isoDate: normalizeDateToIso(rawDate),
+            description, 
+            value 
+          });
           continue;
         }
       }
 
-      // Tentativa 2: Linhas fragmentadas (comum em extrações de PDF onde data, desc e valor ficam em linhas separadas)
+      // Tentativa 2: Linhas fragmentadas
       const dateMatch = line.match(dateRegex);
       if (dateMatch && i + 1 < lines.length) {
         const rawDate = dateMatch[1].trim();
@@ -87,7 +116,12 @@ export async function parseInterInvoice(data: Uint8Array | ArrayBuffer | Buffer)
             const rawVal = valMatch[1].replace(/\./g, '').replace(',', '.');
             const value = parseFloat(rawVal);
             if (!isNaN(value) && value > 0 && !description.toLowerCase().includes('total')) {
-              transactions.push({ date: rawDate, description, value });
+              transactions.push({ 
+                date: rawDate, 
+                isoDate: normalizeDateToIso(rawDate),
+                description, 
+                value 
+              });
               i = valIndex; // avança o cursor
             }
           }

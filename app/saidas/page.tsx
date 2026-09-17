@@ -312,14 +312,53 @@ export default function SaidasPage() {
     return transactions;
   };
 
-  const processOFXFile = async (file: File) => {
+  const processImportFile = async (file: File) => {
     setImportError(null);
     setImporting(true);
     try {
-      const text = await file.text();
-      const parsed = parseOFX(text);
-      if (parsed.length === 0) {
-        throw new Error('Nenhuma transação de saída (débito) encontrada no arquivo OFX.');
+      let parsed: any[] = [];
+      const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+      const isOfx = file.name.toLowerCase().endsWith('.ofx');
+
+      if (!isPdf && !isOfx) {
+        throw new Error('Por favor, envie um arquivo com extensão .ofx ou fatura em .pdf');
+      }
+
+      if (isPdf) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload-fatura', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Erro ao processar fatura em PDF.');
+        }
+
+        if (!data.transactions || data.transactions.length === 0) {
+          throw new Error('Nenhuma transação encontrada no arquivo PDF.');
+        }
+
+        parsed = data.transactions.map((t: any) => ({
+          fitid: '',
+          description: t.description,
+          amount: Number(t.value),
+          date: t.isoDate || format(new Date(), 'yyyy-MM-dd'),
+          importSource: 'PDF Inter'
+        }));
+      } else {
+        const text = await file.text();
+        const ofxParsed = parseOFX(text);
+        if (ofxParsed.length === 0) {
+          throw new Error('Nenhuma transação de saída (débito) encontrada no arquivo OFX.');
+        }
+        parsed = ofxParsed.map((t: any) => ({
+          ...t,
+          importSource: 'OFX'
+        }));
       }
       
       const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -378,13 +417,13 @@ export default function SaidasPage() {
       setImportStep('preview');
       
       setImportConfig({
-        payment_method: activeTab === 'credit_card' ? 'Cartão de Crédito' : 'Pix',
+        payment_method: (activeTab === 'credit_card' || isPdf) ? 'Cartão de Crédito' : 'Pix',
         credit_card_id: filters.credit_card_id || (creditCards[0]?.id || ''),
         default_person_id: people[0]?.id || ''
       });
     } catch (err: any) {
-      console.error('Error processing OFX:', err);
-      setImportError(err.message || 'Erro ao processar o arquivo OFX.');
+      console.error('Error processing import file:', err);
+      setImportError(err.message || 'Erro ao processar o arquivo.');
     } finally {
       setImporting(false);
     }
@@ -393,7 +432,7 @@ export default function SaidasPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      processOFXFile(file);
+      processImportFile(file);
     }
   };
 
@@ -404,10 +443,8 @@ export default function SaidasPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (file && file.name.toLowerCase().endsWith('.ofx')) {
-      processOFXFile(file);
-    } else {
-      setImportError('Por favor, envie um arquivo com extensão .ofx');
+    if (file) {
+      processImportFile(file);
     }
   };
 
@@ -440,7 +477,7 @@ export default function SaidasPage() {
         credit_card_id: importConfig.payment_method === 'Cartão de Crédito' ? importConfig.credit_card_id : null,
         is_fixed: false,
         status: 'paid' as 'paid',
-        notes: `[OFX Import]${t.fitid ? ' FITID: ' + t.fitid : ''}`,
+        notes: t.importSource === 'PDF Inter' ? '[Fatura Inter PDF]' : `[OFX Import]${t.fitid ? ' FITID: ' + t.fitid : ''}`,
         user_id: user.id
       }));
       
@@ -612,7 +649,7 @@ export default function SaidasPage() {
               }}
               className="btn-secondary flex items-center gap-2"
             >
-              <Upload className="w-4 h-4" /> Importar OFX
+              <Upload className="w-4 h-4" /> Importar OFX / Fatura PDF
             </button>
             <button 
               onClick={() => { setEditingItem(null); reset(); setIsModalOpen(true); }}
@@ -1270,11 +1307,11 @@ export default function SaidasPage() {
           </form>
         </Modal>
 
-        {/* OFX Import Modal */}
+        {/* OFX & PDF Import Modal */}
         <Modal 
           isOpen={isImportModalOpen} 
           onClose={() => setIsImportModalOpen(false)} 
-          title="Importar Extrato OFX"
+          title="Importar Extrato OFX ou Fatura PDF"
           maxWidth="max-w-4xl"
         >
           {importStep === 'upload' && (
@@ -1286,7 +1323,7 @@ export default function SaidasPage() {
               >
                 <input 
                   type="file" 
-                  accept=".ofx" 
+                  accept=".ofx, .pdf, application/pdf" 
                   onChange={handleFileChange}
                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
@@ -1295,8 +1332,8 @@ export default function SaidasPage() {
                     <Upload className="w-8 h-8 text-text-secondary group-hover:text-accent transition-transform group-hover:-translate-y-0.5 duration-300" />
                   </div>
                   <div>
-                    <p className="font-semibold text-text text-base">Arraste seu arquivo .ofx aqui</p>
-                    <p className="text-xs text-text-secondary mt-1">ou clique para procurar em seu computador</p>
+                    <p className="font-semibold text-text text-base">Arraste seu arquivo .ofx ou fatura .pdf aqui</p>
+                    <p className="text-xs text-text-secondary mt-1">Compatível com extratos bancários .ofx e faturas em .pdf do Banco Inter</p>
                   </div>
                 </div>
               </div>
@@ -1311,7 +1348,7 @@ export default function SaidasPage() {
               {importing && (
                 <div className="text-center py-4 text-sm text-text-secondary flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-                  Processando arquivo OFX...
+                  Processando arquivo...
                 </div>
               )}
             </div>
