@@ -1,4 +1,4 @@
-const pdfParse = require('pdf-parse');
+import { extractText } from 'unpdf';
 
 export interface InterTransaction {
   date: string;
@@ -6,13 +6,13 @@ export interface InterTransaction {
   value: number;
 }
 
-export async function parseInterInvoice(pdfBuffer: Buffer): Promise<InterTransaction[]> {
+export async function parseInterInvoice(pdfBuffer: Uint8Array | ArrayBuffer): Promise<InterTransaction[]> {
   try {
-    const data = await pdfParse(pdfBuffer);
-    const text = data.text;
+    const { text } = await extractText(pdfBuffer);
     
     // Divide o texto por quebra de linha
-    const lines = text.split('\n');
+    const fullText = Array.isArray(text) ? text.join('\n') : (text || '');
+    const lines = fullText.split('\n');
     const transactions: InterTransaction[] = [];
 
     // Regex para pegar linhas de transação como:
