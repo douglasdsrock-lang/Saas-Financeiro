@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { UploadCloud, FileText, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { InterTransaction } from '@/lib/pdf-parser';
 
 export function FaturaUpload() {
@@ -64,11 +63,12 @@ export function FaturaUpload() {
           className="hidden"
           onChange={handleFileChange}
         />
-        <Button asChild variant={file ? "secondary" : "default"}>
-          <label htmlFor="fatura-upload" className="cursor-pointer">
-            {file ? 'Trocar Arquivo' : 'Selecionar PDF'}
-          </label>
-        </Button>
+        <label 
+          htmlFor="fatura-upload" 
+          className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50/90"
+        >
+          {file ? 'Trocar Arquivo' : 'Selecionar PDF'}
+        </label>
 
         {file && (
           <div className="mt-4 flex items-center justify-center text-sm text-primary">
@@ -86,10 +86,10 @@ export function FaturaUpload() {
       )}
 
       {file && !transactions && (
-        <Button 
+        <button 
           onClick={handleUpload} 
-          className="w-full" 
           disabled={isUploading}
+          className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-slate-900 text-white hover:bg-slate-900/90 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50/90"
         >
           {isUploading ? (
             <>
@@ -99,7 +99,7 @@ export function FaturaUpload() {
           ) : (
             'Extrair Transações'
           )}
-        </Button>
+        </button>
       )}
 
       {transactions && (
@@ -144,9 +144,9 @@ export function FaturaUpload() {
 
           {transactions.length > 0 && (
             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t">
-              <Button className="w-full">
+              <button className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-green-600 text-white hover:bg-green-700">
                 Salvar Transações no Sistema
-              </Button>
+              </button>
             </div>
           )}
         </div>
