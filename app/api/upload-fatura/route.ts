@@ -8,28 +8,33 @@ export async function POST(req: NextRequest) {
 
     if (!file) {
       return NextResponse.json(
-        { error: 'Nenhum arquivo encontrado' },
+        { error: 'Nenhum arquivo enviado.' },
         { status: 400 }
       );
     }
 
-    if (file.type !== 'application/pdf') {
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
       return NextResponse.json(
-        { error: 'O arquivo deve ser um PDF' },
+        { error: 'O arquivo enviado deve ser um PDF.' },
         { status: 400 }
       );
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const uint8Array = new Uint8Array(arrayBuffer);
 
-    const transactions = await parseInterInvoice(buffer);
+    const transactions = await parseInterInvoice(uint8Array);
 
-    return NextResponse.json({ transactions }, { status: 200 });
+    return NextResponse.json({ 
+      success: true,
+      count: transactions.length,
+      transactions 
+    }, { status: 200 });
+
   } catch (error: any) {
     console.error('Erro na API de upload de fatura:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro interno do servidor ao processar fatura' },
+      { error: error.message || 'Erro ao processar a fatura. Verifique o formato do arquivo.' },
       { status: 500 }
     );
   }
