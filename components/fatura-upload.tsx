@@ -109,9 +109,14 @@ export function FaturaUpload() {
               <CheckCircle2 className="w-5 h-5 mr-2" />
               <span className="font-medium">Extração Concluída</span>
             </div>
-            <span className="text-sm text-gray-500">
-              {transactions.length} transações encontradas
-            </span>
+            <div className="text-right">
+              <span className="text-xs text-gray-500 block">
+                {transactions.length} transações encontradas
+              </span>
+              <span className="text-sm font-bold text-red-600">
+                Total: R$ {transactions.reduce((acc, tx) => acc + (Number(tx.value) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
           </div>
           
           <div className="max-h-96 overflow-y-auto">
@@ -134,6 +139,18 @@ export function FaturaUpload() {
                   </tr>
                 ))}
               </tbody>
+              {transactions.length > 0 && (
+                <tfoot className="sticky bottom-0 bg-gray-50 dark:bg-gray-800/90 border-t font-semibold">
+                  <tr>
+                    <td colSpan={2} className="px-4 py-3 text-right text-gray-500">
+                      Total da Fatura:
+                    </td>
+                    <td className="px-4 py-3 text-right text-red-600 font-bold">
+                      R$ {transactions.reduce((acc, tx) => acc + (Number(tx.value) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
             {transactions.length === 0 && (
               <div className="p-8 text-center text-gray-500">
@@ -145,7 +162,7 @@ export function FaturaUpload() {
           {transactions.length > 0 && (
             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t">
               <button className="w-full inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 bg-green-600 text-white hover:bg-green-700">
-                Salvar Transações no Sistema
+                Salvar Transações no Sistema (R$ {transactions.reduce((acc, tx) => acc + (Number(tx.value) || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
               </button>
             </div>
           )}

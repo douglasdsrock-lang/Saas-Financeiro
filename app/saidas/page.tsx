@@ -1354,177 +1354,226 @@ export default function SaidasPage() {
             </div>
           )}
 
-          {importStep === 'preview' && (
-            <div className="space-y-6">
-              {/* Configuration panel */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-panel/20 border border-white/[0.04] p-5 rounded-2xl">
-                <div>
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Método Padrão</label>
-                  <select 
-                    value={importConfig.payment_method}
-                    onChange={(e) => setImportConfig({ ...importConfig, payment_method: e.target.value })}
-                    className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer h-9 w-full"
-                  >
-                    <option value="Dinheiro" className="bg-[#0c0c10] text-white">Dinheiro</option>
-                    <option value="Pix" className="bg-[#0c0c10] text-white">Pix</option>
-                    <option value="Cartão de Crédito" className="bg-[#0c0c10] text-white">Cartão de Crédito</option>
-                    <option value="Cartão de Débito" className="bg-[#0c0c10] text-white">Cartão de Débito</option>
-                    <option value="Boleto" className="bg-[#0c0c10] text-white">Boleto</option>
-                  </select>
+          {importStep === 'preview' && (() => {
+            const selectedTransactions = parsedTransactions.filter(t => t.checked);
+            const selectedTotal = selectedTransactions.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+            const allTotal = parsedTransactions.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+            return (
+              <div className="space-y-6">
+                {/* Total Invoice & Selected Summary Banner */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 rounded-2xl bg-gradient-to-r from-red-500/[0.08] via-panel/30 to-panel/20 border border-red-500/20">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+                      <TrendingDown className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wider block">
+                        Valor Total da Fatura (Marcadas para Importar)
+                      </span>
+                      <div className="flex flex-wrap items-baseline gap-2">
+                        <span className="text-xl font-bold text-red-400">
+                          R$ {selectedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                        {selectedTransactions.length !== parsedTransactions.length && (
+                          <span className="text-xs text-text-secondary">
+                            (Total no arquivo: R$ {allTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 self-start sm:self-auto px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.04]">
+                    <span className="text-xs text-text-secondary">
+                      <strong className="text-white">{selectedTransactions.length}</strong> de <strong className="text-white">{parsedTransactions.length}</strong> selecionadas
+                    </span>
+                  </div>
                 </div>
-                
-                {importConfig.payment_method === 'Cartão de Crédito' && (
+
+                {/* Configuration panel */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-panel/20 border border-white/[0.04] p-5 rounded-2xl">
                   <div>
-                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Cartão de Crédito</label>
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Método Padrão</label>
                     <select 
-                      value={importConfig.credit_card_id}
-                      onChange={(e) => setImportConfig({ ...importConfig, credit_card_id: e.target.value })}
+                      value={importConfig.payment_method}
+                      onChange={(e) => setImportConfig({ ...importConfig, payment_method: e.target.value })}
+                      className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer h-9 w-full"
+                    >
+                      <option value="Dinheiro" className="bg-[#0c0c10] text-white">Dinheiro</option>
+                      <option value="Pix" className="bg-[#0c0c10] text-white">Pix</option>
+                      <option value="Cartão de Crédito" className="bg-[#0c0c10] text-white">Cartão de Crédito</option>
+                      <option value="Cartão de Débito" className="bg-[#0c0c10] text-white">Cartão de Débito</option>
+                      <option value="Boleto" className="bg-[#0c0c10] text-white">Boleto</option>
+                    </select>
+                  </div>
+                  
+                  {importConfig.payment_method === 'Cartão de Crédito' && (
+                    <div>
+                      <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Cartão de Crédito</label>
+                      <select 
+                        value={importConfig.credit_card_id}
+                        onChange={(e) => setImportConfig({ ...importConfig, credit_card_id: e.target.value })}
+                        className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer h-9 w-full"
+                      >
+                        <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                        {creditCards.map(cc => <option key={cc.id} value={cc.id} className="bg-[#0c0c10] text-white">{cc.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Pessoa Padrão</label>
+                    <select 
+                      value={importConfig.default_person_id}
+                      onChange={(e) => setImportConfig({ ...importConfig, default_person_id: e.target.value })}
                       className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer h-9 w-full"
                     >
                       <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                      {creditCards.map(cc => <option key={cc.id} value={cc.id} className="bg-[#0c0c10] text-white">{cc.name}</option>)}
+                      {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
                     </select>
                   </div>
-                )}
-                
-                <div>
-                  <label className="block text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1.5">Pessoa Padrão</label>
-                  <select 
-                    value={importConfig.default_person_id}
-                    onChange={(e) => setImportConfig({ ...importConfig, default_person_id: e.target.value })}
-                    className="bg-panel/30 border border-white/[0.04] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer h-9 w-full"
-                  >
-                    <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                    {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
-                  </select>
                 </div>
-              </div>
 
-              {/* Transactions Preview Table */}
-              <div className="max-h-[350px] overflow-y-auto border border-white/[0.04] rounded-2xl bg-panel/10 backdrop-blur-md">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-panel/90 backdrop-blur-md border-b border-white/[0.04] z-10">
-                    <tr className="text-text-secondary font-bold">
-                      <th className="p-4 w-8">
-                        <input 
-                          type="checkbox"
-                          checked={parsedTransactions.length > 0 && parsedTransactions.every(t => t.checked)}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setParsedTransactions(parsedTransactions.map(t => ({ ...t, checked })));
-                          }}
-                          className="checkbox-custom"
-                        />
-                      </th>
-                      <th className="p-4 w-20">Data</th>
-                      <th className="p-4">Descrição</th>
-                      <th className="p-4 w-24 font-bold text-right">Valor</th>
-                      <th className="p-4 w-40">Categoria</th>
-                      <th className="p-4 w-32">Pessoa</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.02]">
-                    {parsedTransactions.map((trx, index) => (
-                      <tr 
-                        key={index} 
-                        className={`hover:bg-white/[0.01] transition-colors border-b border-white/[0.02] last:border-0 ${
-                          trx.isDuplicate ? 'bg-amber-500/[0.03] border-l-2 border-l-amber-500/50' : ''
-                        }`}
-                      >
-                        <td className="p-4">
+                {/* Transactions Preview Table */}
+                <div className="max-h-[350px] overflow-y-auto border border-white/[0.04] rounded-2xl bg-panel/10 backdrop-blur-md">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-panel/90 backdrop-blur-md border-b border-white/[0.04] z-10">
+                      <tr className="text-text-secondary font-bold">
+                        <th className="p-4 w-8">
                           <input 
                             type="checkbox"
-                            checked={trx.checked}
+                            checked={parsedTransactions.length > 0 && parsedTransactions.every(t => t.checked)}
                             onChange={(e) => {
-                              const updated = [...parsedTransactions];
-                              updated[index].checked = e.target.checked;
-                              setParsedTransactions(updated);
+                              const checked = e.target.checked;
+                              setParsedTransactions(parsedTransactions.map(t => ({ ...t, checked })));
                             }}
                             className="checkbox-custom"
                           />
-                        </td>
-                        <td className="p-4 text-text-secondary whitespace-nowrap">
-                          {formatDate(trx.date)}
-                        </td>
-                        <td className="p-4">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-medium text-white">{trx.description}</span>
-                            {trx.isDuplicate && (
-                              <span className="inline-flex items-center gap-1 text-[9px] text-amber-400 font-black uppercase tracking-wider mt-0.5">
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Já Importado / Duplicado
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-4 text-right font-semibold text-red-500 whitespace-nowrap">
-                          R$ {trx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="p-4">
-                          <select 
-                            value={trx.category_id}
-                            onChange={(e) => {
-                              const updated = [...parsedTransactions];
-                              updated[index].category_id = e.target.value;
-                              setParsedTransactions(updated);
-                            }}
-                            className="bg-panel/30 border border-white/[0.04] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer w-full"
-                          >
-                            <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                            {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0c0c10] text-white">{c.name}</option>)}
-                          </select>
-                        </td>
-                        <td className="p-4">
-                          <select 
-                            value={trx.person_id}
-                            onChange={(e) => {
-                              const updated = [...parsedTransactions];
-                              updated[index].person_id = e.target.value;
-                              setParsedTransactions(updated);
-                            }}
-                            className="bg-panel/30 border border-white/[0.04] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer w-full"
-                          >
-                            <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
-                            {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
-                          </select>
-                        </td>
+                        </th>
+                        <th className="p-4 w-20">Data</th>
+                        <th className="p-4">Descrição</th>
+                        <th className="p-4 w-28 font-bold text-right">Valor</th>
+                        <th className="p-4 w-40">Categoria</th>
+                        <th className="p-4 w-32">Pessoa</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {importError && (
-                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <p>{importError}</p>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.02]">
+                      {parsedTransactions.map((trx, index) => (
+                        <tr 
+                          key={index} 
+                          className={`hover:bg-white/[0.01] transition-colors border-b border-white/[0.02] last:border-0 ${
+                            trx.isDuplicate ? 'bg-amber-500/[0.03] border-l-2 border-l-amber-500/50' : ''
+                          }`}
+                        >
+                          <td className="p-4">
+                            <input 
+                              type="checkbox"
+                              checked={trx.checked}
+                              onChange={(e) => {
+                                const updated = [...parsedTransactions];
+                                updated[index].checked = e.target.checked;
+                                setParsedTransactions(updated);
+                              }}
+                              className="checkbox-custom"
+                            />
+                          </td>
+                          <td className="p-4 text-text-secondary whitespace-nowrap">
+                            {formatDate(trx.date)}
+                          </td>
+                          <td className="p-4">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium text-white">{trx.description}</span>
+                              {trx.isDuplicate && (
+                                <span className="inline-flex items-center gap-1 text-[9px] text-amber-400 font-black uppercase tracking-wider mt-0.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> Já Importado / Duplicado
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-4 text-right font-semibold text-red-500 whitespace-nowrap">
+                            R$ {trx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4">
+                            <select 
+                              value={trx.category_id}
+                              onChange={(e) => {
+                                const updated = [...parsedTransactions];
+                                updated[index].category_id = e.target.value;
+                                setParsedTransactions(updated);
+                              }}
+                              className="bg-panel/30 border border-white/[0.04] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer w-full"
+                            >
+                              <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                              {categories.map(c => <option key={c.id} value={c.id} className="bg-[#0c0c10] text-white">{c.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="p-4">
+                            <select 
+                              value={trx.person_id}
+                              onChange={(e) => {
+                                const updated = [...parsedTransactions];
+                                updated[index].person_id = e.target.value;
+                                setParsedTransactions(updated);
+                              }}
+                              className="bg-panel/30 border border-white/[0.04] rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-accent/40 transition-all cursor-pointer w-full"
+                            >
+                              <option value="" className="bg-[#0c0c10] text-white">Selecione...</option>
+                              {people.map(p => <option key={p.id} value={p.id} className="bg-[#0c0c10] text-white">{p.name}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {parsedTransactions.length > 0 && (
+                      <tfoot className="sticky bottom-0 bg-panel/95 backdrop-blur-md border-t border-white/[0.06] font-semibold text-xs">
+                        <tr>
+                          <td colSpan={3} className="p-4 text-text-secondary text-right">
+                            Total Selecionado ({selectedTransactions.length} itens):
+                          </td>
+                          <td className="p-4 text-right font-bold text-red-400 whitespace-nowrap">
+                            R$ {selectedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
                 </div>
-              )}
-              
-              <div className="flex gap-4 pt-4 border-t border-white/[0.04]">
-                <button 
-                  onClick={() => setImportStep('upload')}
-                  className="btn-secondary flex-1"
-                  disabled={importing}
-                >
-                  Voltar
-                </button>
-                <button 
-                  onClick={handleConfirmImport}
-                  className="btn-primary flex-1 flex items-center justify-center gap-2"
-                  disabled={importing || parsedTransactions.filter(t => t.checked).length === 0}
-                >
-                  {importing ? (
-                    <>
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Importando...
-                    </>
-                  ) : (
-                    `Importar ${parsedTransactions.filter(t => t.checked).length} transação(ões)`
-                  )}
-                </button>
+
+                {importError && (
+                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 text-red-400 text-sm">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <p>{importError}</p>
+                  </div>
+                )}
+                
+                <div className="flex gap-4 pt-4 border-t border-white/[0.04]">
+                  <button 
+                    onClick={() => setImportStep('upload')}
+                    className="btn-secondary flex-1"
+                    disabled={importing}
+                  >
+                    Voltar
+                  </button>
+                  <button 
+                    onClick={handleConfirmImport}
+                    className="btn-primary flex-1 flex items-center justify-center gap-2"
+                    disabled={importing || selectedTransactions.length === 0}
+                  >
+                    {importing ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Importando...
+                      </>
+                    ) : (
+                      `Importar ${selectedTransactions.length} transação(ões) • R$ ${selectedTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    )}
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </Modal>
       </div>
     </SidebarLayout>
